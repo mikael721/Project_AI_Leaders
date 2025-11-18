@@ -1,0 +1,119 @@
+/* style.css */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Arial", sans-serif;
+  background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  color: #fff;
+}
+
+.game-container {
+  text-align: center;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+h1 {
+  margin-bottom: 30px;
+  font-size: 2.5em;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.board-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 600px;
+  height: 600px;
+}
+
+.board-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.game-board {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hex-button {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 4px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+}
+
+.hex-button:hover {
+  transform: translate(-50%, -50%) scale(1.1);
+  border-color: rgba(255, 215, 0, 0.8);
+  background: rgba(255, 215, 0, 0.2);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+}
+
+.hex-button.active {
+  background: radial-gradient(
+    circle,
+    rgba(255, 215, 0, 0.8) 0%,
+    rgba(255, 165, 0, 0.6) 100%
+  );
+  border-color: #ffd700;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.9);
+}
+
+.reset-button {
+  margin-top: 30px;
+  padding: 15px 40px;
+  font-size: 1.2em;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.reset-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.reset-button:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .board-wrapper {
+    width: 90vw;
+    height: 90vw;
+    max-width: 500px;
+    max-height: 500px;
+  }
+
+  .hex-button {
+    width: 55px;
+    height: 55px;
+  }
+}
