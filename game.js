@@ -1,4 +1,4 @@
-import { TreeMap } from "./gs/TreeMap";
+import { TreeMap } from "./gs/TreeMap.js";
 
 class HexagonalBoard {
   constructor() {
@@ -9,7 +9,7 @@ class HexagonalBoard {
     this.init();
 
     // === Untuk UI TREE MAP ===
-    this.map = mapInisiasi();
+    this.map = this.mapInisiasi();
   }
 
   mapInisiasi(){
