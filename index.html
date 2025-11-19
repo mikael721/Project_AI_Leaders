@@ -4,22 +4,81 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hexagonal Board Game</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="cards.css" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+      crossorigin="anonymous" />
   </head>
   <body>
     <div class="game-container">
       <div class="logo-wrapper">
         <img src="Leaders_logo.png" alt="Leaders Logo" class="logo-image" />
       </div>
-      <div class="board-wrapper">
-        <img
-          src="Assets BGA/Leaders_Board.png"
-          alt="Game Board"
-          class="board-image" />
-        <div id="game-board" class="game-board"></div>
+
+      <div class="main-content">
+        <div class="cards-column">
+          <div class="playing-card">
+            <img
+              src="Full Art/LEADERS-Acrobate.PNG"
+              alt="Acrobate"
+              class="card-image" />
+            <div class="card-info">
+              <div class="card-description">
+                Acrobate: Master of agility and balance. Move swiftly across the
+                board.
+              </div>
+            </div>
+          </div>
+
+          <div class="playing-card">
+            <img
+              src="Full Art/LEADERS-Acrobate.PNG"
+              alt="Power King"
+              class="card-image" />
+            <div class="card-info">
+              <div class="card-description">
+                Power King: Royal command. Take control of any adjacent
+                territory.
+              </div>
+            </div>
+          </div>
+
+          <div class="playing-card">
+            <img
+              src="Full Art/LEADERS-Acrobate.PNG"
+              alt="Action Queen"
+              class="card-image" />
+            <div class="card-info">
+              <div class="card-description">
+                Action Queen: Tactical advantage. Block opponent's next move.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="board-wrapper">
+          <img
+            src="Assets BGA/Leaders_Board.png"
+            alt="Game Board"
+            class="board-image" />
+          <div id="game-board" class="game-board"></div>
+        </div>
       </div>
+
       <button id="reset-btn" class="reset-button">Reset Board</button>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+      crossorigin="anonymous"></script>
     <script src="game.js"></script>
   </body>
 </html>
