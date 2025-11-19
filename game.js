@@ -1,10 +1,19 @@
-// game.js
+import { TreeMap } from "./gs/TreeMap";
+
 class HexagonalBoard {
   constructor() {
+    // === Untuk UI BOARD ===
     this.board = document.getElementById("game-board");
     this.buttons = [];
     this.positions = this.calculatePositions();
     this.init();
+
+    // === Untuk UI TREE MAP ===
+    this.map = mapInisiasi();
+  }
+
+  mapInisiasi(){
+    console.log("tes");
   }
 
   calculatePositions() {
