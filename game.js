@@ -1,16 +1,5 @@
 // game.js
-
-// TreeMap structure definition
-export const TreeMap = {
-  parent: null,
-  isConqueredByRed: 0,
-  isConqueredByBlue: 0,
-  onTree: null,
-  children: [null, null, null, null, null, null],
-  fungsiTest: (param) => {
-    console.log("Isi : " + param);
-  },
-};
+import { TreeMap, createTreeNode } from "./TreeMap.js";
 
 class HexagonalBoard {
   constructor() {
@@ -138,18 +127,9 @@ class HexagonalBoard {
   }
 
   initializeTree() {
-    // Create a tree node for each position
+    // Create a tree node for each position using the factory function
     for (let i = 0; i < this.positions.length; i++) {
-      this.tree[i] = {
-        parent: null,
-        isConqueredByRed: 0,
-        isConqueredByBlue: 0,
-        onTree: i, // Store the position index
-        children: [null, null, null, null, null, null],
-        fungsiTest: (param) => {
-          console.log(`Node ${i} - Isi: ${param}`);
-        },
-      };
+      this.tree[i] = createTreeNode(i);
     }
 
     // Build tree relationships based on adjacency
