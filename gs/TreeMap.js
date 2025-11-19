@@ -1,10 +1,25 @@
+// TreeMap structure definition
 export const TreeMap = {
-    paren: null,
-    isConquereByRed: 0,
-    isConquereByBlue: 0,
-    onTree: null,
-    childe: [null,null,null,null,null,null],
-    fungsiTes: (param) => {
-        console.log('Isi : ' + param);
-    }
+  parent: null,
+  isConqueredByRed: 0,
+  isConqueredByBlue: 0,
+  onTree: null,
+  children: [null, null, null, null, null, null],
+  fungsiTest: (param) => {
+    console.log("Isi : " + param);
+  },
+};
+
+// Factory function to create new TreeMap nodes
+export function createTreeNode(index) {
+  return {
+    parent: null,
+    isConqueredByRed: 0,
+    isConqueredByBlue: 0,
+    onTree: index,
+    children: [null, null, null, null, null, null],
+    fungsiTest: (param) => {
+      console.log(`Node ${index} - Isi: ${param}`);
+    },
+  };
 }
