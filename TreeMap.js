@@ -1,7 +1,6 @@
 // Factory function to create new TreeMap nodes
 export function createTreeNode(index) {
   return {
-    pasukanDiPetakIni: null,
     pasukanGambar: null,
     pasukanID: null,
 
