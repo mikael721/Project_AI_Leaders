@@ -2,6 +2,9 @@
 export function createTreeNode(index) {
   return {
     pasukanDiPetakIni: null,
+    pasukanGambar: null,
+    pasukanID: null,
+
     isConqueredByWhite: 0,
     isConqueredByBlack: 0,
     
