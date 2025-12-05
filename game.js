@@ -1,5 +1,6 @@
 // game.js
 import { createTreeNode } from "./TreeMap.js";
+import { characters } from "./Karakter.js";
 
 class HexagonalBoard {
   constructor() {
@@ -8,14 +9,131 @@ class HexagonalBoard {
     this.positions = this.calculatePositions();
     this.adjacencyMap = this.calculateAdjacency();
     this.tree = [];
+    this.currentTurn = "white";
+    this.whiteStartPositions = [30, 31, 32, 34, 35, 36];
+    this.blackStartPositions = [9, 4, 1, 3, 8, 15];
+    this.availableCharacters = this.getAvailableCharacters();
+    this.currentCards = [null, null, null];
     this.init();
   }
 
-  // === Membuat Map Treenya
+  getAvailableCharacters() {
+    // Filter out Kings and Cub (id: 17)
+    return characters.filter((char) => !char.isKing && char.id !== 17);
+  }
+
+  getRandomCharacter() {
+    if (this.availableCharacters.length === 0) {
+      return null;
+    }
+    const randomIndex = Math.floor(
+      Math.random() * this.availableCharacters.length
+    );
+    const character = this.availableCharacters.splice(randomIndex, 1)[0];
+    return character;
+  }
+
+  initializeCards() {
+    for (let i = 0; i < 3; i++) {
+      const character = this.getRandomCharacter();
+      if (character) {
+        this.currentCards[i] = character;
+        this.updateCardDisplay(i, character);
+      }
+    }
+  }
+
+  updateCardDisplay(cardIndex, character) {
+    const cardElements = document.querySelectorAll(".playing-card");
+    if (cardElements[cardIndex] && character) {
+      const img = cardElements[cardIndex].querySelector(".card-image");
+      const description =
+        cardElements[cardIndex].querySelector(".card-description");
+
+      img.src = character.fullart;
+      img.alt = character.nama;
+      description.textContent = `${character.nama}: ${character.ability}`;
+
+      cardElements[cardIndex].dataset.characterIndex = cardIndex;
+    }
+  }
+
+  placeLeaders() {
+    // Place ROI (white, id: 0) at position 33
+    const roiChar = characters.find((char) => char.id === 0);
+    if (roiChar) {
+      this.placeCharacterAtPosition(roiChar, 33, "white");
+    }
+
+    // Place REINE (black, id: 1) at position 0
+    const reineChar = characters.find((char) => char.id === 1);
+    if (reineChar) {
+      this.placeCharacterAtPosition(reineChar, 0, "black");
+    }
+  }
+
+  placeCharacterAtPosition(character, position, team) {
+    const button = this.buttons[position];
+    const iconSrc = team === "white" ? character.white : character.black;
+
+    const img = document.createElement("img");
+    img.src = iconSrc;
+    img.alt = character.nama;
+    img.className = "character-icon";
+    img.style.width = "100%";
+    img.style.height = "100%";
+    img.style.objectFit = "contain";
+    img.style.position = "absolute";
+    img.style.top = "0";
+    img.style.left = "0";
+
+    button.innerHTML = "";
+    button.appendChild(img);
+    button.classList.add("active");
+    button.dataset.active = "true";
+
+    this.tree[position].pasukanGambar = iconSrc;
+    this.tree[position].pasukanID = character.id; // Use character.id instead of nama
+
+    if (team === "white") {
+      this.tree[position].isConqueredByWhite = 1;
+    } else {
+      this.tree[position].isConqueredByBlack = 1;
+    }
+  }
+
+  placeHermitCub(team) {
+    // Find available positions based on team
+    const validPositions =
+      team === "white" ? this.whiteStartPositions : this.blackStartPositions;
+
+    // Filter out occupied positions
+    const availablePositions = validPositions.filter(
+      (pos) => this.tree[pos].pasukanID === null
+    );
+
+    // If no available positions, don't place the cub
+    if (availablePositions.length === 0) {
+      console.log(`No available space to place CUB for ${team}`);
+      return;
+    }
+
+    // Randomly select one of the available positions
+    const randomIndex = Math.floor(Math.random() * availablePositions.length);
+    const selectedPosition = availablePositions[randomIndex];
+
+    // Get the CUB character
+    const cubChar = characters.find((char) => char.id === 17);
+    if (cubChar) {
+      this.placeCharacterAtPosition(cubChar, selectedPosition, team);
+      console.log(`CUB placed at position ${selectedPosition} for ${team}`);
+    }
+  }
+
   createMapTree() {
     const tree = [];
     for (let i = 0; i < this.positions.length; i++) {
-      tree[i] = createTreeNode(i); // ini set index untuk paramnya, jangan lupa !!!
+      tree[i] = createTreeNode(i);
     }
     for (let i = 0; i < this.positions.length; i++) {
       const adjacentNodes = this.adjacencyMap[i];
@@ -30,27 +148,20 @@ class HexagonalBoard {
   }
 
   calculatePositions() {
-    // Positions based on the actual circular pips visible in the hexagonal board image
-    // Coordinates are in percentage (%) from top-left corner
-
     const positions = [];
 
-    // Row 1 (Top - 1 corner pip) (0)
     positions.push({ x: 50, y: 9, isCorner: true });
 
-    // Row 2 (3 pips) (1-3)
     positions.push({ x: 36.5, y: 16.5, isCorner: true });
     positions.push({ x: 50, y: 23, isCorner: false });
     positions.push({ x: 63.5, y: 16.5, isCorner: true });
 
-    // Row 3 (5 pips) (4-8)
     positions.push({ x: 23, y: 23, isCorner: true });
     positions.push({ x: 36.5, y: 30, isCorner: false });
     positions.push({ x: 50, y: 36.5, isCorner: false });
     positions.push({ x: 63.5, y: 30, isCorner: false });
     positions.push({ x: 77, y: 23, isCorner: true });
 
-    // Row 4 (7 pips) (9-15)
     positions.push({ x: 9.7, y: 30, isCorner: true });
     positions.push({ x: 23, y: 36.5, isCorner: false });
     positions.push({ x: 36.5, y: 43, isCorner: false });
@@ -59,7 +170,6 @@ class HexagonalBoard {
     positions.push({ x: 77, y: 36.5, isCorner: false });
     positions.push({ x: 90.2, y: 30, isCorner: true });
 
-    // Row 5 (7 pips - middle row) (16-22)
     positions.push({ x: 9.7, y: 43, isCorner: true });
     positions.push({ x: 23, y: 50, isCorner: false });
     positions.push({ x: 36.5, y: 57, isCorner: false });
@@ -68,7 +178,6 @@ class HexagonalBoard {
     positions.push({ x: 77, y: 50, isCorner: false });
     positions.push({ x: 90.2, y: 43, isCorner: true });
 
-    // Row 6 (7 pips) (23-29)
     positions.push({ x: 9.7, y: 57, isCorner: true });
     positions.push({ x: 23, y: 63.5, isCorner: false });
     positions.push({ x: 36.5, y: 70.1, isCorner: false });
@@ -77,7 +186,6 @@ class HexagonalBoard {
     positions.push({ x: 77, y: 63.5, isCorner: false });
     positions.push({ x: 90.2, y: 57, isCorner: true });
 
-    // Row 7 (7 pips) (30-36)
     positions.push({ x: 9.7, y: 70.1, isCorner: true });
     positions.push({ x: 23, y: 77, isCorner: true });
     positions.push({ x: 36.5, y: 83.5, isCorner: true });
@@ -90,7 +198,6 @@ class HexagonalBoard {
   }
 
   calculateAdjacency() {
-    // Manually define adjacency based on hexagonal board structure
     const adjacencyMap = {
       0: [1, 2, 3],
       1: [0, 2, 4, 5],
@@ -141,30 +248,10 @@ class HexagonalBoard {
   init() {
     this.tree = this.createMapTree();
     this.createButtons();
+    this.placeLeaders(); // Place leaders at start
     this.attachEventListeners();
+    this.initializeCards();
   }
-
-  // initializeTree() {
-  //   // Create a tree node for each position
-  //   // Create a tree node for each position using the factory function
-  //   for (let i = 0; i < this.positions.length; i++) {
-  //     this.tree[i] = createTreeNode(i);
-  //   }
-
-  //   // Build tree relationships based on adjacency
-  //   // Each node's children are its adjacent nodes
-  //   for (let i = 0; i < this.positions.length; i++) {
-  //     const adjacentNodes = this.adjacencyMap[i];
-  //     adjacentNodes.forEach((adjIndex, childSlot) => {
-  //       if (childSlot < 6) {
-  //         // Ensure we don't exceed 6 children
-  //         this.tree[i].children[childSlot] = this.tree[adjIndex];
-  //       }
-  //     });
-  //   }
-
-  //   console.log("Tree structure initialized:", this.tree);
-  // }
 
   createButtons() {
     this.positions.forEach((pos, index) => {
@@ -197,6 +284,26 @@ class HexagonalBoard {
 
     const resetBtn = document.getElementById("reset-btn");
     resetBtn.addEventListener("click", () => this.resetBoard());
+
+    const cardElements = document.querySelectorAll(".playing-card");
+    cardElements.forEach((card, index) => {
+      card.addEventListener("click", () => this.handleCardClick(index));
+    });
+  }
+
+  selectedCardIndex = null;
+
+  handleCardClick(cardIndex) {
+    const cardElements = document.querySelectorAll(".playing-card");
+
+    cardElements.forEach((card) => card.classList.remove("selected"));
+
+    if (this.selectedCardIndex === cardIndex) {
+      this.selectedCardIndex = null;
+    } else {
+      this.selectedCardIndex = cardIndex;
+      cardElements[cardIndex].classList.add("selected");
+    }
   }
 
   handleButtonHover(event, isHovering) {
@@ -205,12 +312,10 @@ class HexagonalBoard {
     const adjacentIndices = this.adjacencyMap[index];
 
     if (isHovering) {
-      // Highlight adjacent buttons (children in tree)
       adjacentIndices.forEach((adjIndex) => {
         this.buttons[adjIndex].classList.add("adjacent");
       });
     } else {
-      // Remove highlight from adjacent buttons
       adjacentIndices.forEach((adjIndex) => {
         this.buttons[adjIndex].classList.remove("adjacent");
       });
@@ -220,41 +325,81 @@ class HexagonalBoard {
   handleButtonClick(event) {
     const button = event.target;
     const index = parseInt(button.dataset.index);
-    const isActive = button.dataset.active === "true";
 
-    if (isActive) {
-      button.classList.remove("active");
-      button.dataset.active = "false";
-
-      this.tree[index].isConqueredByRed = 0;
-      this.tree[index].isConqueredByBlue = 0;
-    
-    } else {
-      button.classList.add("active");
-      button.dataset.active = "true";
-      // Example: Mark as conquered by Red (you can implement game logic here)
-      
-      this.tree[index].isConqueredByRed = 1;
+    if (this.selectedCardIndex === null) {
+      return;
     }
 
-    // Add a small animation effect
-    const originalTransform = button.style.transform;
-    button.style.transform = "translate(-50%, -50%) scale(1.2)";
-    setTimeout(() => {
-      button.style.transform = originalTransform;
-    }, 150);
+    const validPositions =
+      this.currentTurn === "white"
+        ? this.whiteStartPositions
+        : this.blackStartPositions;
 
-    // Log tree node information
-    this.tree[index].fungsiTest('Tes');
+    if (!validPositions.includes(index)) {
+      alert(
+        `${
+          this.currentTurn === "white" ? "White" : "Black"
+        } can only place at positions: ${validPositions.join(", ")}`
+      );
+      return;
+    }
+
+    if (this.tree[index].pasukanID !== null) {
+      alert("This position is already occupied!");
+      return;
+    }
+
+    const character = this.currentCards[this.selectedCardIndex];
+    if (!character) {
+      return;
+    }
+
+    // Place the character
+    this.placeCharacterAtPosition(character, index, this.currentTurn);
+
+    // Check if it's HERMIT (id: 16), then place CUB
+    if (character.id === 16) {
+      this.placeHermitCub(this.currentTurn);
+    }
+
+    // Get new random character for the card
+    const newCharacter = this.getRandomCharacter();
+    if (newCharacter) {
+      this.currentCards[this.selectedCardIndex] = newCharacter;
+      this.updateCardDisplay(this.selectedCardIndex, newCharacter);
+    }
+
+    const cardElements = document.querySelectorAll(".playing-card");
+    cardElements.forEach((card) => card.classList.remove("selected"));
+    this.selectedCardIndex = null;
+
+    this.currentTurn = this.currentTurn === "white" ? "black" : "white";
+
+    this.tree[index].fungsiTest("Tes");
   }
 
   resetBoard() {
     this.buttons.forEach((button, index) => {
       button.classList.remove("active");
       button.dataset.active = "false";
-      this.tree[index].isConqueredByRed = 0;
-      this.tree[index].isConqueredByBlue = 0;
+      button.innerHTML = "";
+      this.tree[index].isConqueredByWhite = 0;
+      this.tree[index].isConqueredByBlack = 0;
+      this.tree[index].pasukanGambar = null;
+      this.tree[index].pasukanID = null;
     });
+
+    this.currentTurn = "white";
+    this.availableCharacters = this.getAvailableCharacters();
+    this.currentCards = [null, null, null];
+    this.selectedCardIndex = null;
+
+    // Re-place leaders after reset
+    this.placeLeaders();
+    this.initializeCards();
+
+    const cardElements = document.querySelectorAll(".playing-card");
+    cardElements.forEach((card) => card.classList.remove("selected"));
   }
 
   getActivePositions() {
@@ -267,12 +412,10 @@ class HexagonalBoard {
     return this.getActivePositions().length;
   }
 
-  // New method to get tree node by index
   getTreeNode(index) {
     return this.tree[index];
   }
 
-  // New method to traverse tree from a starting node
   traverseTree(startIndex, callback) {
     const visited = new Set();
     const queue = [this.tree[startIndex]];
@@ -284,7 +427,6 @@ class HexagonalBoard {
       visited.add(node.onTree);
       callback(node);
 
-      // Add children to queue
       node.children.forEach((child) => {
         if (child && !visited.has(child.onTree)) {
           queue.push(child);
@@ -294,11 +436,9 @@ class HexagonalBoard {
   }
 }
 
-// Initialize the game when DOM is loaded
 document.addEventListener("DOMContentLoaded", () => {
   const game = new HexagonalBoard();
 
-  // Make game instance available globally for debugging
   window.game = game;
 
   console.log(
@@ -307,10 +447,8 @@ document.addEventListener("DOMContentLoaded", () => {
     "positions"
   );
 
-  // Example: Access tree structure
   console.log("Tree for position 0:", game.getTreeNode(0));
 
-  // Example: Traverse tree from position 12 (center)
   console.log("Traversing tree from position 12:");
   game.traverseTree(12, (node) => {
     console.log(`Visiting node ${node.onTree}`);

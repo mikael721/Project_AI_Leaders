@@ -6,27 +6,30 @@ export const characters = [
     nama: "ROI",
     ability: "leader",
     fullart: "/Full Art/LEADERS-Roi.PNG",
-    white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_LeaderRoi.png",
+    white:
+      "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_LeaderRoi.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_LeaderRoi.png",
     poin: 5,
     isKing: true,
 
     tim: "white",
     possition: null,
-    id: null
+    id: 0,
   },
   {
     nama: "REINE",
     ability: "leader",
     fullart: "/Full Art/LEADERS-Reine.PNG",
-    white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_LeaderReine.png",
-    black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_LeaderReine.png",
+    white:
+      "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_LeaderReine.png",
+    black:
+      "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_LeaderReine.png",
     poin: 5,
     isKing: true,
 
     tim: "white",
     possition: null,
-    id: null
+    id: 1,
   },
 
   // ============================
@@ -34,7 +37,8 @@ export const characters = [
   // ============================
   {
     nama: "ACROBAT",
-    ability: "Jumps in a straight line over an adjacent character. May jump twice consecutively.",
+    ability:
+      "Jumps in a straight line over an adjacent character. May jump twice consecutively.",
     fullart: "/Full Art/LEADERS-Acrobate.PNG",
     white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Acrobate.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Acrobate.png",
@@ -43,7 +47,7 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: null
+    id: 2,
   },
   {
     nama: "CAVALIER",
@@ -56,7 +60,7 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: null
+    id: 3,
   },
   {
     nama: "COGNEUR",
@@ -69,59 +73,68 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: null
+    id: 4,
   },
   {
     nama: "ROYAL GUARD",
     ability: "Moves from any space to a space adjacent to your Leader.",
     fullart: "Full Art/LEADERS-GardeRoyal.PNG",
-    white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_GardeRoyal.png",
-    black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_GardeRoyal.png",
+    white:
+      "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_GardeRoyal.png",
+    black:
+      "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_GardeRoyal.png",
     poin: 3,
     isKing: false,
 
     tim: "white",
     possition: null,
-    id: null
+    id: 5,
   },
   {
     nama: "ILLUSIONIST",
-    ability: "Switches places with a non-adjacent visible character in a straight line.",
+    ability:
+      "Switches places with a non-adjacent visible character in a straight line.",
     fullart: "Full Art/LEADERS-Shifter.PNG",
-    white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Illusionniste.png",
-    black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Illusionniste.png",
+    white:
+      "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Illusionniste.png",
+    black:
+      "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Illusionniste.png",
     poin: 3,
     isKing: false,
 
     tim: "white",
     possition: null,
-    id: null
+    id: 6,
   },
   {
     nama: "CLAW LAUNCHER",
     ability: "Moves in a straight line to a visible character or drags them.",
     fullart: "Full Art/LEADERS-LanceGrappin.PNG",
-    white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_LanceGrappin.png",
-    black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_LanceGrappin.png",
+    white:
+      "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_LanceGrappin.png",
+    black:
+      "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_LanceGrappin.png",
     poin: 3,
     isKing: false,
 
     tim: "white",
     possition: null,
-    id: null
+    id: 7,
   },
   {
     nama: "MANIPULATOR",
     ability: "Moves a non-adjacent enemy in a straight line by one space.",
     fullart: "Full Art/LEADERS-Manipulatrice.PNG",
-    white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Manipulatrice.png",
-    black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Manipulatrice.png",
+    white:
+      "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Manipulatrice.png",
+    black:
+      "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Manipulatrice.png",
     poin: 3,
     isKing: false,
 
     tim: "white",
     possition: null,
-    id: null
+    id: 8,
   },
   {
     nama: "WANDERER",
@@ -134,20 +147,21 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: null
+    id: 9,
   },
   {
     nama: "BREWMASTER",
     ability: "Moves an adjacent ally one space.",
     fullart: "Full Art/LEADERS-Cuisinier.PNG",
-    white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Tavernier.png",
+    white:
+      "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Tavernier.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Tavernier.png",
     poin: 3,
     isKing: false,
 
     tim: "white",
     possition: null,
-    id: null
+    id: 10,
   },
 
   // ============================
@@ -164,7 +178,7 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: null
+    id: 11,
   },
   {
     nama: "ASSASSIN",
@@ -177,7 +191,7 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: null
+    id: 12,
   },
   {
     nama: "JAILER",
@@ -190,20 +204,22 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: null
+    id: 13,
   },
   {
     nama: "PROTECTOR",
     ability: "Enemy abilities may not move adjacent allies.",
     fullart: "Full Art/LEADERS-Ancien.PNG",
-    white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Protecteur.png",
-    black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Protecteur.png",
+    white:
+      "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Protecteur.png",
+    black:
+      "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Protecteur.png",
     poin: 4,
     isKing: false,
 
     tim: "white",
     possition: null,
-    id: null
+    id: 14,
   },
   {
     nama: "VIZIER",
@@ -216,7 +232,7 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: null
+    id: 15,
   },
 
   // ============================
@@ -226,18 +242,19 @@ export const characters = [
     nama: "HERMIT",
     ability: "Spawns Hermit + Cub. Both can move individually.",
     fullart: "Full Art/LEADERS-MaitreDesBetes.PNG",
-    white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_VieilOurs.png",
+    white:
+      "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_VieilOurs.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_VieilOurs.png",
     poin: 6,
     isKing: false,
 
     tim: "white",
     possition: null,
-    id: null
+    id: 16,
   },
   {
     nama: "CUB",
-    ability: "-",
+    ability: "no ability",
     fullart: "Full Art/LEADERS-Ours.PNG",
     white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Ourson.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Ourson.png",
@@ -246,7 +263,7 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: null
+    id: 17,
   },
   {
     nama: "NEMESIS",
@@ -259,6 +276,6 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: null
-  }
+    id: 18,
+  },
 ];

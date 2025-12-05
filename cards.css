@@ -46,6 +46,12 @@
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
 }
 
+.playing-card.selected {
+  border: 3px solid #ffd700;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+  transform: translateY(-5px);
+}
+
 .card-image {
   width: 100%;
   height: 100%;
@@ -90,9 +96,9 @@
   align-items: center;
   width: 100%;
 }
-.hex-button.adjacent {
-  background-color: rgba(255, 215, 0, 0.3);
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+
+.character-icon {
+  pointer-events: none;
 }
 
 @media (max-width: 992px) {
