@@ -10,8 +10,10 @@ export function createTreeNode(index) {
     onTree: index, // ini pasukan yang nempati sekarang
     children: [null, null, null, null, null, null], // ntik link kan ke adj
     
-    fungsiTest: (param) => {
-      console.log(`Node ${index} - Isi: ${param}`);
+    fungsiTest(param){
+      console.log(`Node ${index} - Isi: ${param} - pasukanID: ${this.pasukanID ? this.pasukanID : 'Belum Ada Pasukan'}`);
     },
   };
 }
+
+
