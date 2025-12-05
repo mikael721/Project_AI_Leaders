@@ -60,7 +60,7 @@ class HexagonalBoard {
 
   placeLeaders() {
     // Place ROI (white, id: 0) at position 33
-    const roiChar = characters.find((char) => char.id === 0);
+    const roiChar = characters.find((char) => char.id === 19);
     if (roiChar) {
       this.placeCharacterAtPosition(roiChar, 33, "white");
     }
@@ -93,6 +93,7 @@ class HexagonalBoard {
     button.dataset.active = "true";
 
     this.tree[position].pasukanGambar = iconSrc;
+    console.log("leader id:" + character.id + " nama: " + character.nama);
     this.tree[position].pasukanID = character.id; // Use character.id instead of nama
 
     if (team === "white") {
@@ -325,6 +326,7 @@ class HexagonalBoard {
   handleButtonClick(event) {
     const button = event.target;
     const index = parseInt(button.dataset.index);
+    this.tree[index].fungsiTest("General Click: ");
 
     if (this.selectedCardIndex === null) {
       return;
@@ -375,7 +377,7 @@ class HexagonalBoard {
 
     this.currentTurn = this.currentTurn === "white" ? "black" : "white";
 
-    this.tree[index].fungsiTest("Tes");
+    this.tree[index].fungsiTest("Selelah place");
   }
 
   resetBoard() {

@@ -14,7 +14,7 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: 0,
+    id: 19,
   },
   {
     nama: "REINE",
