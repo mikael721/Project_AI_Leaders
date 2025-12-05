@@ -1,5 +1,5 @@
 // game.js
-import { TreeMap, createTreeNode } from "./TreeMap.js";
+import { createTreeNode } from "./TreeMap.js";
 
 class HexagonalBoard {
   constructor() {
@@ -7,8 +7,26 @@ class HexagonalBoard {
     this.buttons = [];
     this.positions = this.calculatePositions();
     this.adjacencyMap = this.calculateAdjacency();
-    this.tree = []; // Array to store tree nodes for each position
+    this.tree = [];
     this.init();
+  }
+
+  // === Membuat Map Treenya
+  createMapTree() {
+    const tree = [];
+    for (let i = 0; i < this.positions.length; i++) {
+      tree[i] = createTreeNode(i); // ini set index untuk paramnya, jangan lupa !!!
+    }
+    for (let i = 0; i < this.positions.length; i++) {
+      const adjacentNodes = this.adjacencyMap[i];
+
+      adjacentNodes.forEach((adjIndex, slot) => {
+        if (slot < 6) {
+          tree[i].children[slot] = tree[adjIndex];
+        }
+      });
+    }
+    return tree;
   }
 
   calculatePositions() {
@@ -121,32 +139,32 @@ class HexagonalBoard {
   }
 
   init() {
-    this.initializeTree();
+    this.tree = this.createMapTree();
     this.createButtons();
     this.attachEventListeners();
   }
 
-  initializeTree() {
-    // Create a tree node for each position
-    // Create a tree node for each position using the factory function
-    for (let i = 0; i < this.positions.length; i++) {
-      this.tree[i] = createTreeNode(i);
-    }
+  // initializeTree() {
+  //   // Create a tree node for each position
+  //   // Create a tree node for each position using the factory function
+  //   for (let i = 0; i < this.positions.length; i++) {
+  //     this.tree[i] = createTreeNode(i);
+  //   }
 
-    // Build tree relationships based on adjacency
-    // Each node's children are its adjacent nodes
-    for (let i = 0; i < this.positions.length; i++) {
-      const adjacentNodes = this.adjacencyMap[i];
-      adjacentNodes.forEach((adjIndex, childSlot) => {
-        if (childSlot < 6) {
-          // Ensure we don't exceed 6 children
-          this.tree[i].children[childSlot] = this.tree[adjIndex];
-        }
-      });
-    }
+  //   // Build tree relationships based on adjacency
+  //   // Each node's children are its adjacent nodes
+  //   for (let i = 0; i < this.positions.length; i++) {
+  //     const adjacentNodes = this.adjacencyMap[i];
+  //     adjacentNodes.forEach((adjIndex, childSlot) => {
+  //       if (childSlot < 6) {
+  //         // Ensure we don't exceed 6 children
+  //         this.tree[i].children[childSlot] = this.tree[adjIndex];
+  //       }
+  //     });
+  //   }
 
-    console.log("Tree structure initialized:", this.tree);
-  }
+  //   console.log("Tree structure initialized:", this.tree);
+  // }
 
   createButtons() {
     this.positions.forEach((pos, index) => {
@@ -207,12 +225,15 @@ class HexagonalBoard {
     if (isActive) {
       button.classList.remove("active");
       button.dataset.active = "false";
+
       this.tree[index].isConqueredByRed = 0;
       this.tree[index].isConqueredByBlue = 0;
+    
     } else {
       button.classList.add("active");
       button.dataset.active = "true";
       // Example: Mark as conquered by Red (you can implement game logic here)
+      
       this.tree[index].isConqueredByRed = 1;
     }
 
@@ -224,9 +245,7 @@ class HexagonalBoard {
     }, 150);
 
     // Log tree node information
-    this.tree[index].fungsiTest(
-      `Clicked - Red: ${this.tree[index].isConqueredByRed}, Blue: ${this.tree[index].isConqueredByBlue}`
-    );
+    this.tree[index].fungsiTest('Tes');
   }
 
   resetBoard() {

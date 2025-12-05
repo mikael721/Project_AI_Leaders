@@ -1,22 +1,13 @@
-export const TreeMap = {
-  parent: null,
-  isConqueredByRed: 0,
-  isConqueredByBlue: 0,
-  onTree: null,
-  children: [null, null, null, null, null, null],
-  fungsiTest: (param) => {
-    console.log("Isi : " + param);
-  },
-};
-
 // Factory function to create new TreeMap nodes
 export function createTreeNode(index) {
   return {
-    parent: null,
-    isConqueredByRed: 0,
-    isConqueredByBlue: 0,
-    onTree: index,
-    children: [null, null, null, null, null, null],
+    pasukanDiPetakIni: null,
+    isConqueredByWhite: 0,
+    isConqueredByBlack: 0,
+    
+    onTree: index, // ini pasukan yang nempati sekarang
+    children: [null, null, null, null, null, null], // ntik link kan ke adj
+    
     fungsiTest: (param) => {
       console.log(`Node ${index} - Isi: ${param}`);
     },
