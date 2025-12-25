@@ -24,7 +24,31 @@
     </style>
   </head>
   <body>
-    <div class="game-container">
+    <div id="difficulty-modal" class="difficulty-modal">
+      <div class="difficulty-container">
+        <h2>Select Game Mode</h2>
+        <div class="difficulty-options">
+          <button class="difficulty-btn" data-mode="2-player">2 Player</button>
+          <button class="difficulty-btn" data-mode="ai">AI</button>
+        </div>
+        <div id="ai-difficulty" class="ai-difficulty" style="display: none">
+          <h3>Select Difficulty</h3>
+          <div class="difficulty-options">
+            <button class="ai-difficulty-btn" data-difficulty="easy">
+              Easy
+            </button>
+            <button class="ai-difficulty-btn" data-difficulty="normal">
+              Normal
+            </button>
+            <button class="ai-difficulty-btn" data-difficulty="hard">
+              Hard
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-container" style="display: none">
       <div class="logo-wrapper">
         <img src="Leaders_logo.png" alt="Leaders Logo" class="logo-image" />
       </div>
@@ -76,6 +100,19 @@
             alt="Game Board"
             class="board-image" />
           <div id="game-board" class="game-board"></div>
+        </div>
+
+        <div class="right-panel">
+          <div class="turn-indicator">
+            <h3>Current Turn</h3>
+            <div class="turn-display">
+              <div id="turn-team" class="turn-team white">White</div>
+              <div id="turn-count" class="turn-count">Turn 1</div>
+            </div>
+          </div>
+          <div class="game-info">
+            <p id="game-mode-display" class="game-mode-text"></p>
+          </div>
         </div>
       </div>
 

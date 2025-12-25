@@ -53,7 +53,7 @@ export const characters = [
     nama: "CAVALIER",
     ability: "Moves two spaces in a straight line.",
     fullart: "Full Art/LEADERS-Cavalier.PNG",
-    white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_black_Cavalier.png",
+    white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Cavalier.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Cavalier.png",
     poin: 3,
     isKing: false,
@@ -64,7 +64,8 @@ export const characters = [
   },
   {
     nama: "COGNEUR",
-    ability: "Moves to an adjacent enemy’s space, pushing them.",
+    ability:
+      "Moves to an adjacent enemy/ally space, pushing them. Useless if they are in a corner ",
     fullart: "Full Art/LEADERS-COGNEUR.PNG",
     white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Cogneur.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Cogneur.png",
