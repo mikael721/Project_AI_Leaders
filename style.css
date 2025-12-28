@@ -355,10 +355,53 @@ h1 {
   box-shadow: inset 0 0 10px rgba(74, 222, 128, 0.5);
 }
 
-/* Or if you want to differentiate between normal and special moves */
-.hex-button.move-target.special {
-  background-color: #22c55e; /* Brighter green for special */
-  box-shadow: inset 0 0 15px rgba(34, 197, 94, 0.7);
+.ability-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: stretch;
+}
+
+.ability-btn {
+  font-size: 0.875rem; /* Slightly smaller text */
+  font-weight: 600;
+  padding: 8px 12px; /* Reduced padding */
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
+  text-align: center;
+  letter-spacing: 0.4px;
+}
+
+/* Special Ability Button */
+#use-special-btn.ability-btn.active {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5),
+    inset 0 0 6px rgba(34, 197, 94, 0.3);
+  border: 2px solid #15803d;
+}
+
+#use-special-btn.ability-btn.active:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.7),
+    inset 0 0 8px rgba(34, 197, 94, 0.4);
+}
+
+/* Normal Move Button */
+#use-normal-btn.ability-btn {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+  border: 2px solid #1d4ed8;
+}
+
+#use-normal-btn.ability-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.5);
 }
 
 .hex-button.special-ability {

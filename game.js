@@ -22,11 +22,12 @@ class HexagonalBoard {
     this.maxRecruitmentTurns = 4;
 
     // Movement phase tracking - per character
-    this.currentPhase = "move"; // "move" or "recruit"
-    this.teamCharactersToMove = []; // List of character positions for current turn
-    this.currentCharacterIndex = 0; // Index in teamCharactersToMove array
-    this.selectedCharacterPosition = null; // Position of character selected for moving
-    this.movedCharacters = new Set(); // Track which characters have moved this turn
+    this.currentPhase = "move";
+    this.teamCharactersToMove = [];
+    this.currentCharacterIndex = 0;
+    this.selectedCharacterPosition = null;
+    this.movedCharacters = new Set();
+    this.useSpecialAbility = true; // Default to special ability
 
     this.init();
     this.displayGameInfo();
@@ -313,7 +314,6 @@ class HexagonalBoard {
   }
 
   initializePhasePanel() {
-    // Create phase display elements if they don't exist
     const rightPanel = document.querySelector(".right-panel");
 
     if (!document.getElementById("phase-display")) {
@@ -328,11 +328,54 @@ class HexagonalBoard {
         <div class="character-turn-display" id="character-turn-display">
           <div id="current-character" class="current-character">Select a character</div>
         </div>
+        <div class="ability-toggle" id="ability-toggle">
+          <button id="use-special-btn" class="ability-btn active">Use Special Ability</button>
+          <button id="use-normal-btn" class="ability-btn">Normal Move (1 Space)</button>
+        </div>
       `;
 
-      // Insert after turn indicator
       const turnIndicator = rightPanel.querySelector(".turn-indicator");
       turnIndicator.after(phaseContainer);
+
+      // Add event listeners for ability toggle buttons
+      const useSpecialBtn = document.getElementById("use-special-btn");
+      const useNormalBtn = document.getElementById("use-normal-btn");
+
+      useSpecialBtn.addEventListener("click", () => {
+        this.useSpecialAbility = true;
+        useSpecialBtn.classList.add("active");
+        useNormalBtn.classList.remove("active");
+
+        // If a character is selected, update the highlights
+        if (this.selectedCharacterPosition !== null) {
+          this.clearHighlights();
+          this.buttons[this.selectedCharacterPosition].classList.add(
+            "selected-character"
+          );
+          const availableMoves = this.getMovePositions(
+            this.selectedCharacterPosition
+          );
+          this.highlightMovePositions(availableMoves);
+        }
+      });
+
+      useNormalBtn.addEventListener("click", () => {
+        this.useSpecialAbility = false;
+        useNormalBtn.classList.add("active");
+        useSpecialBtn.classList.remove("active");
+
+        // If a character is selected, update the highlights
+        if (this.selectedCharacterPosition !== null) {
+          this.clearHighlights();
+          this.buttons[this.selectedCharacterPosition].classList.add(
+            "selected-character"
+          );
+          const availableMoves = this.getMovePositions(
+            this.selectedCharacterPosition
+          );
+          this.highlightMovePositions(availableMoves);
+        }
+      });
     }
   }
 
@@ -377,7 +420,6 @@ class HexagonalBoard {
   selectedCardIndex = null;
 
   handleCardClick(cardIndex) {
-    // Only allow card selection during recruit phase
     if (this.currentPhase !== "recruit") {
       alert("You can only recruit during the recruitment phase!");
       return;
@@ -413,7 +455,6 @@ class HexagonalBoard {
     }
   }
 
-  // Helper method to find which line a position is on
   findLineForPosition(position) {
     for (const [lineType, lines] of Object.entries(HexagonalBoard.lines)) {
       for (const line of lines) {
@@ -425,7 +466,6 @@ class HexagonalBoard {
     return null;
   }
 
-  // Helper method to get positions along a line in a direction
   getPositionsInDirection(position, lineType, direction = 1) {
     const lines = HexagonalBoard.lines[lineType];
     for (const line of lines) {
@@ -441,12 +481,10 @@ class HexagonalBoard {
     return [];
   }
 
-  // Helper method to check if a position is a corner
   isCornerPosition(position) {
     return this.positions[position].isCorner;
   }
 
-  // Helper method to get leader position
   getLeaderPosition(team) {
     const leaderId = team === "white" ? 19 : 1;
     for (let i = 0; i < this.tree.length; i++) {
@@ -456,32 +494,38 @@ class HexagonalBoard {
     }
     return null;
   }
-  //isak
-  // ACROBAT (id: 2) - Jump over adjacent characters, can repeat 2 times
+
+  // Movement Ability
+  // FIXED: ACROBAT - Now allows 2 jumps, must have adjacent enemy/ally
   getAcrobatMoves(characterPos, team) {
     const moves = new Set();
 
-    const addJumps = (currentPos, jumpsRemaining) => {
+    const addJumps = (
+      currentPos,
+      jumpsRemaining,
+      visitedPositions = new Set()
+    ) => {
       if (jumpsRemaining === 0) return;
 
       const adjacent = this.adjacencyMap[currentPos];
       for (const adjPos of adjacent) {
         const adjNode = this.tree[adjPos];
-        // If adjacent has a character (ally or enemy)
+        // Must have a character (enemy or ally) to jump over
         if (adjNode.pasukanID !== null) {
-          // Find position after the character in the same direction
           const direction = adjPos - currentPos;
           const nextPos = adjPos + direction;
 
           if (nextPos >= 0 && nextPos < this.tree.length) {
-            // Check if it's in the adjacency (valid position)
             if (this.adjacencyMap[adjPos].includes(nextPos)) {
               const nextNode = this.tree[nextPos];
-              // Can land on empty space
-              if (nextNode.pasukanID === null) {
+              if (
+                nextNode.pasukanID === null &&
+                !visitedPositions.has(nextPos)
+              ) {
                 moves.add(nextPos);
-                // Continue jumping from this position
-                addJumps(nextPos, jumpsRemaining - 1);
+                const newVisited = new Set(visitedPositions);
+                newVisited.add(nextPos);
+                addJumps(nextPos, jumpsRemaining - 1, newVisited);
               }
             }
           }
@@ -489,65 +533,11 @@ class HexagonalBoard {
       }
     };
 
-    addJumps(characterPos, 2);
-    return Array.from(moves);
-  }
-  //error
-  // CAVALIER (id: 3) - Move vertically 2 spaces
-  getCavalierMoves(characterPos) {
-    const moves = new Set();
-    const lineInfo = this.findLineForPosition(characterPos);
-
-    if (!lineInfo || lineInfo.lineType !== "vertical") {
-      return [];
-    }
-
-    const line = lineInfo.line;
-    const index = line.indexOf(characterPos);
-
-    // Move up 2 spaces
-    if (index - 2 >= 0) {
-      const targetPos = line[index - 2];
-      if (this.tree[targetPos].pasukanID === null) {
-        moves.add(targetPos);
-      }
-    }
-
-    // Move down 2 spaces
-    if (index + 2 < line.length) {
-      const targetPos = line[index + 2];
-      if (this.tree[targetPos].pasukanID === null) {
-        moves.add(targetPos);
-      }
-    }
-
+    addJumps(characterPos, 2, new Set([characterPos]));
     return Array.from(moves);
   }
 
-  //error (didnt push)
-  // COGNEUR (id: 4) - Move to occupied space and push
-  getCogneurMoves(characterPos) {
-    const moves = new Set();
-    const adjacent = this.adjacencyMap[characterPos];
-
-    for (const adjPos of adjacent) {
-      const adjNode = this.tree[adjPos];
-
-      // Can move to occupied space if it's not a corner
-      if (adjNode.pasukanID !== null && !this.isCornerPosition(adjPos)) {
-        moves.add(adjPos);
-      }
-    }
-
-    // Also include normal empty moves
-    const emptyMoves = this.getAvailableMovePositions(characterPos);
-    emptyMoves.forEach((pos) => moves.add(pos));
-
-    return Array.from(moves);
-  }
-
-  //isak
-  // ROYAL GUARD (id: 5) - Move to any space adjacent to leader
+  //WORKED
   getRoyalGuardMoves(team) {
     const leaderPos = this.getLeaderPosition(team);
     if (leaderPos === null) return [];
@@ -564,137 +554,15 @@ class HexagonalBoard {
     return Array.from(moves);
   }
 
-  //ERROR
-  // ILLUSIONIST (id: 6) - Switch places with non-adjacent character in straight line
-  getIllusionistMoves(characterPos, team) {
-    const moves = new Set();
-    const lineInfo = this.findLineForPosition(characterPos);
-
-    if (!lineInfo) return [];
-
-    const line = lineInfo.line;
-    const index = line.indexOf(characterPos);
-    const adjacent = this.adjacencyMap[characterPos];
-
-    // Check both directions on the line
-    for (let i = 0; i < line.length; i++) {
-      if (i !== index && !adjacent.includes(line[i])) {
-        const targetPos = line[i];
-        const targetNode = this.tree[targetPos];
-        // Can switch with any character
-        if (targetNode.pasukanID !== null) {
-          moves.add(targetPos);
-        }
-      }
-    }
-
-    return Array.from(moves);
-  }
-
-  //ERROR
-  // CLAW LAUNCHER (id: 7) - Move or drag character in straight line
-  getClawLauncherMoves(characterPos, team) {
-    const moves = new Set();
-    const lineInfo = this.findLineForPosition(characterPos);
-
-    if (!lineInfo) return [];
-
-    const line = lineInfo.line;
-    const index = line.indexOf(characterPos);
-
-    // Check positions in both directions on the line
-    for (let i = index + 1; i < line.length; i++) {
-      const pos = line[i];
-      const node = this.tree[pos];
-
-      if (node.pasukanID === null) {
-        // Empty space - can move here
-        moves.add(pos);
-      } else {
-        // Character found - can move before them or drag them
-        if (i > index + 1) {
-          moves.add(line[i - 1]);
-        }
-        moves.add(pos);
-        break;
-      }
-    }
-
-    // Check backward direction
-    for (let i = index - 1; i >= 0; i--) {
-      const pos = line[i];
-      const node = this.tree[pos];
-
-      if (node.pasukanID === null) {
-        moves.add(pos);
-      } else {
-        if (i < index - 1) {
-          moves.add(line[i + 1]);
-        }
-        moves.add(pos);
-        break;
-      }
-    }
-
-    return Array.from(moves);
-  }
-
-  //ERROR
-  // MANIPULATOR (id: 8) - Move non-adjacent enemy in straight line by one space
-  getManipulatorMoves(characterPos, team) {
-    const moves = new Set();
-    const lineInfo = this.findLineForPosition(characterPos);
-
-    if (!lineInfo) return [];
-
-    const line = lineInfo.line;
-    const index = line.indexOf(characterPos);
-    const adjacent = this.adjacencyMap[characterPos];
-
-    // Check both directions on the line
-    for (let i = 0; i < line.length; i++) {
-      if (i !== index && !adjacent.includes(line[i])) {
-        const targetPos = line[i];
-        const targetNode = this.tree[targetPos];
-
-        // Must be a character (enemy)
-        if (targetNode.pasukanID !== null) {
-          // Check if it's an enemy
-          const isEnemy =
-            (team === "white" && targetNode.isConqueredByBlack === 1) ||
-            (team === "black" && targetNode.isConqueredByWhite === 1);
-
-          if (isEnemy) {
-            // Can move one space away from current position on the line
-            const direction = i < index ? -1 : 1;
-            const nextPos = line[i + direction];
-
-            if (
-              nextPos !== undefined &&
-              this.tree[nextPos].pasukanID === null
-            ) {
-              moves.add(nextPos);
-            }
-          }
-        }
-      }
-    }
-
-    return Array.from(moves);
-  }
-
-  //ISAK
-  // WANDERER (id: 9) - Move to any space non-adjacent to enemy
+  //WORKED
   getWandererMoves(characterPos, team) {
     const moves = new Set();
 
-    // Get all empty positions
     for (let i = 0; i < this.tree.length; i++) {
       if (i === characterPos || this.tree[i].pasukanID !== null) {
         continue;
       }
 
-      // Check if any adjacent position has an enemy
       const adjacent = this.adjacencyMap[i];
       let hasAdjacentEnemy = false;
 
@@ -720,8 +588,254 @@ class HexagonalBoard {
     return Array.from(moves);
   }
 
-  //ERROR
-  // BREWMASTER (id: 10) - Move adjacent ally one space
+  // 1. CAVALIER - Moves vertically 2 spaces in a straight line
+  getCavalierMoves(characterPos) {
+    const moves = new Set();
+
+    // Find which vertical line contains this position
+    const verticalLine = HexagonalBoard.lines.vertical.find((line) =>
+      line.includes(characterPos)
+    );
+
+    if (!verticalLine) return [];
+
+    const index = verticalLine.indexOf(characterPos);
+
+    // Check 2 spaces up
+    if (index - 2 >= 0) {
+      const targetPos = verticalLine[index - 2];
+      if (this.tree[targetPos].pasukanID === null) {
+        moves.add(targetPos);
+      }
+    }
+
+    // Check 2 spaces down
+    if (index + 2 < verticalLine.length) {
+      const targetPos = verticalLine[index + 2];
+      if (this.tree[targetPos].pasukanID === null) {
+        moves.add(targetPos);
+      }
+    }
+
+    return Array.from(moves);
+  }
+
+  // FIXED: COGNEUR - Moves to occupied space and pushes (can't push from corners)
+  getCogneurMoves(characterPos, team) {
+    const moves = new Set();
+
+    // First, add all empty adjacent positions (normal moves)
+    const adjacent = this.adjacencyMap[characterPos];
+    for (const adjPos of adjacent) {
+      if (this.tree[adjPos].pasukanID === null) {
+        moves.add(adjPos);
+      }
+    }
+
+    // Check all line types for pushing opportunities
+    const allLines = [
+      ...HexagonalBoard.lines.vertical,
+      ...HexagonalBoard.lines.diagonalTopLeft,
+      ...HexagonalBoard.lines.diagonalTopRight,
+    ];
+
+    for (const line of allLines) {
+      const index = line.indexOf(characterPos);
+      if (index === -1) continue;
+
+      // Check both directions in this line
+      for (const direction of [-1, 1]) {
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= line.length) continue;
+
+        const targetPos = line[targetIndex];
+
+        // Must be adjacent to current position
+        if (!adjacent.includes(targetPos)) continue;
+
+        const targetNode = this.tree[targetPos];
+
+        // If there's a piece at target position
+        if (targetNode.pasukanID !== null) {
+          // Check if target is not on a corner
+          if (!this.isCornerPosition(targetPos)) {
+            // Check if there's space behind the target to push to
+            const pushIndex = targetIndex + direction;
+            if (pushIndex >= 0 && pushIndex < line.length) {
+              const pushPos = line[pushIndex];
+              // Must be adjacent to target position
+              if (
+                this.adjacencyMap[targetPos].includes(pushPos) &&
+                this.tree[pushPos].pasukanID === null
+              ) {
+                moves.add(targetPos);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return Array.from(moves);
+  }
+
+  // FIXED: ILLUSIONIST - Switch places with non-adjacent character in same line
+  getIllusionistMoves(characterPos, team) {
+    const moves = new Set();
+    const adjacent = this.adjacencyMap[characterPos];
+
+    // Check all line types
+    const allLines = [
+      ...HexagonalBoard.lines.vertical,
+      ...HexagonalBoard.lines.diagonalTopLeft,
+      ...HexagonalBoard.lines.diagonalTopRight,
+    ];
+
+    for (const line of allLines) {
+      const index = line.indexOf(characterPos);
+      if (index === -1) continue;
+
+      // Check all positions in this line
+      for (let i = 0; i < line.length; i++) {
+        if (i === index) continue; // Skip current position
+
+        const targetPos = line[i];
+
+        // Must not be adjacent and must have a character
+        if (
+          !adjacent.includes(targetPos) &&
+          this.tree[targetPos].pasukanID !== null
+        ) {
+          moves.add(targetPos);
+        }
+      }
+    }
+
+    return Array.from(moves);
+  }
+
+  // FIXED: CLAW LAUNCHER - Moves in front of visible character or drags them
+  getClawLauncherMoves(characterPos, team) {
+    const moves = new Set();
+
+    // Check all line types
+    const allLines = [
+      ...HexagonalBoard.lines.vertical,
+      ...HexagonalBoard.lines.diagonalTopLeft,
+      ...HexagonalBoard.lines.diagonalTopRight,
+    ];
+
+    for (const line of allLines) {
+      const index = line.indexOf(characterPos);
+      if (index === -1) continue;
+
+      // Search forward
+      let firstCharacterForward = null;
+      for (let i = index + 1; i < line.length; i++) {
+        const pos = line[i];
+        const node = this.tree[pos];
+
+        if (node.pasukanID !== null) {
+          firstCharacterForward = i;
+          break;
+        }
+      }
+
+      if (firstCharacterForward !== null) {
+        const characterPos = line[firstCharacterForward];
+
+        // Can move to position right before the character (one space away)
+        if (firstCharacterForward === index + 1) {
+          // Character is immediately adjacent, can't move in front
+        } else {
+          moves.add(line[firstCharacterForward - 1]);
+        }
+
+        // Can drag character to any empty position between current and character
+        for (let i = index + 1; i < firstCharacterForward; i++) {
+          if (this.tree[line[i]].pasukanID === null) {
+            moves.add(line[i]);
+          }
+        }
+      }
+
+      // Search backward
+      let firstCharacterBackward = null;
+      for (let i = index - 1; i >= 0; i--) {
+        const pos = line[i];
+        const node = this.tree[pos];
+
+        if (node.pasukanID !== null) {
+          firstCharacterBackward = i;
+          break;
+        }
+      }
+
+      if (firstCharacterBackward !== null) {
+        // Can move to position right before the character (one space away)
+        if (firstCharacterBackward === index - 1) {
+          // Character is immediately adjacent, can't move in front
+        } else {
+          moves.add(line[firstCharacterBackward + 1]);
+        }
+
+        // Can drag character to any empty position between current and character
+        for (let i = index - 1; i > firstCharacterBackward; i--) {
+          if (this.tree[line[i]].pasukanID === null) {
+            moves.add(line[i]);
+          }
+        }
+      }
+    }
+
+    return Array.from(moves);
+  }
+
+  // FIXED: MANIPULATOR - Moves enemy in line of sight to adjacent empty space
+  getManipulatorMoves(characterPos, team) {
+    const moves = new Set();
+
+    // Check all line types
+    const allLines = [
+      ...HexagonalBoard.lines.vertical,
+      ...HexagonalBoard.lines.diagonalTopLeft,
+      ...HexagonalBoard.lines.diagonalTopRight,
+    ];
+
+    for (const line of allLines) {
+      const index = line.indexOf(characterPos);
+      if (index === -1) continue;
+
+      // Search in both directions along the line
+      for (let i = 0; i < line.length; i++) {
+        if (i === index) continue;
+
+        const targetPos = line[i];
+        const targetNode = this.tree[targetPos];
+
+        // Must have an enemy character
+        if (targetNode.pasukanID !== null) {
+          const isEnemy =
+            (team === "white" && targetNode.isConqueredByBlack === 1) ||
+            (team === "black" && targetNode.isConqueredByWhite === 1);
+
+          if (isEnemy) {
+            // Find adjacent empty positions to this enemy
+            const enemyAdjacent = this.adjacencyMap[targetPos];
+            for (const adjPos of enemyAdjacent) {
+              if (this.tree[adjPos].pasukanID === null) {
+                moves.add(adjPos);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return Array.from(moves);
+  }
+
+  // FIXED: BREWMASTER - Moves adjacent ally to adjacent empty space
   getBrewmasterMoves(characterPos, team) {
     const moves = new Set();
     const adjacent = this.adjacencyMap[characterPos];
@@ -729,14 +843,13 @@ class HexagonalBoard {
     for (const adjPos of adjacent) {
       const adjNode = this.tree[adjPos];
 
-      // Must be an adjacent ally
       if (adjNode.pasukanID !== null) {
         const isAlly =
           (team === "white" && adjNode.isConqueredByWhite === 1) ||
           (team === "black" && adjNode.isConqueredByBlack === 1);
 
         if (isAlly) {
-          // Get empty spaces adjacent to this ally
+          // Find adjacent empty positions to this ally
           const allyAdjacent = this.adjacencyMap[adjPos];
           for (const allyAdjPos of allyAdjacent) {
             if (this.tree[allyAdjPos].pasukanID === null) {
@@ -750,7 +863,6 @@ class HexagonalBoard {
     return Array.from(moves);
   }
 
-  // Get special move positions for each ability
   getSpecialMovePositions(characterPos) {
     const node = this.tree[characterPos];
     const character = characters.find((c) => c.id === node.pasukanID);
@@ -761,42 +873,49 @@ class HexagonalBoard {
     let specialMoves = [];
 
     switch (character.id) {
-      case 2: // ACROBAT
+      case 2:
         specialMoves = this.getAcrobatMoves(characterPos, team);
         break;
-      case 3: // CAVALIER
+      case 3:
         specialMoves = this.getCavalierMoves(characterPos);
         break;
-      case 4: // COGNEUR
-        specialMoves = this.getCogneurMoves(characterPos);
+      case 4:
+        specialMoves = this.getCogneurMoves(characterPos, team);
         break;
-      case 5: // ROYAL GUARD
+      case 5:
         specialMoves = this.getRoyalGuardMoves(team);
         break;
-      case 6: // ILLUSIONIST
+      case 6:
         specialMoves = this.getIllusionistMoves(characterPos, team);
         break;
-      case 7: // CLAW LAUNCHER
+      case 7:
         specialMoves = this.getClawLauncherMoves(characterPos, team);
         break;
-      case 8: // MANIPULATOR
+      case 8:
         specialMoves = this.getManipulatorMoves(characterPos, team);
         break;
-      case 9: // WANDERER
+      case 9:
         specialMoves = this.getWandererMoves(characterPos, team);
         break;
-      case 10: // BREWMASTER
+      case 10:
         specialMoves = this.getBrewmasterMoves(characterPos, team);
         break;
       default:
-        // Regular movement for characters without special abilities
         specialMoves = this.getAvailableMovePositions(characterPos);
     }
 
     return specialMoves;
   }
 
-  // Get all positions with characters belonging to a team
+  // New method to get moves based on current ability toggle
+  getMovePositions(characterPos) {
+    if (this.useSpecialAbility) {
+      return this.getSpecialMovePositions(characterPos);
+    } else {
+      return this.getAvailableMovePositions(characterPos);
+    }
+  }
+
   getTeamCharacterPositions(team) {
     const positions = [];
     for (let i = 0; i < this.tree.length; i++) {
@@ -817,28 +936,292 @@ class HexagonalBoard {
     return positions;
   }
 
-  // Get available adjacent empty positions for movement
   getAvailableMovePositions(fromPosition) {
     const adjacentPositions = this.adjacencyMap[fromPosition];
     return adjacentPositions.filter((pos) => this.tree[pos].pasukanID === null);
   }
 
-  // Check if a character can move (has at least one empty adjacent spot)
   canCharacterMove(position) {
     return this.getAvailableMovePositions(position).length > 0;
   }
 
-  // Move character from one position to another
+  // UPDATED: moveCharacter to handle special abilities properly
   moveCharacter(fromPosition, toPosition) {
     const node = this.tree[fromPosition];
     const character = characters.find((c) => c.id === node.pasukanID);
 
     if (!character) return false;
 
-    // Determine team
     const team = node.isConqueredByWhite === 1 ? "white" : "black";
+    const targetNode = this.tree[toPosition];
 
-    // Clear old position
+    // Handle special abilities that involve other characters
+    if (this.useSpecialAbility) {
+      // ILLUSIONIST - Swap positions
+      if (character.id === 6 && targetNode.pasukanID !== null) {
+        const targetCharacter = characters.find(
+          (c) => c.id === targetNode.pasukanID
+        );
+        const targetTeam =
+          targetNode.isConqueredByWhite === 1 ? "white" : "black";
+
+        // Clear both positions
+        this.buttons[fromPosition].innerHTML = "";
+        this.buttons[fromPosition].classList.remove(
+          "active",
+          "selected-character"
+        );
+        this.buttons[fromPosition].dataset.active = "false";
+        this.tree[fromPosition].pasukanGambar = null;
+        this.tree[fromPosition].pasukanID = null;
+        this.tree[fromPosition].isConqueredByWhite = 0;
+        this.tree[fromPosition].isConqueredByBlack = 0;
+
+        this.buttons[toPosition].innerHTML = "";
+        this.buttons[toPosition].classList.remove("active");
+        this.buttons[toPosition].dataset.active = "false";
+        this.tree[toPosition].pasukanGambar = null;
+        this.tree[toPosition].pasukanID = null;
+        this.tree[toPosition].isConqueredByWhite = 0;
+        this.tree[toPosition].isConqueredByBlack = 0;
+
+        // Place characters in swapped positions
+        this.placeCharacterAtPosition(character, toPosition, team);
+        this.placeCharacterAtPosition(
+          targetCharacter,
+          fromPosition,
+          targetTeam
+        );
+
+        return true;
+      }
+
+      // COGNEUR - Push character
+      if (character.id === 4 && targetNode.pasukanID !== null) {
+        // Find the line and direction
+        const allLines = [
+          ...HexagonalBoard.lines.vertical,
+          ...HexagonalBoard.lines.diagonalTopLeft,
+          ...HexagonalBoard.lines.diagonalTopRight,
+        ];
+
+        for (const line of allLines) {
+          const fromIndex = line.indexOf(fromPosition);
+          const toIndex = line.indexOf(toPosition);
+
+          if (fromIndex !== -1 && toIndex !== -1) {
+            const direction = toIndex > fromIndex ? 1 : -1;
+            const pushIndex = toIndex + direction;
+
+            if (pushIndex >= 0 && pushIndex < line.length) {
+              const pushPos = line[pushIndex];
+
+              if (this.tree[pushPos].pasukanID === null) {
+                // Move the target character to push position
+                const pushedCharacter = characters.find(
+                  (c) => c.id === targetNode.pasukanID
+                );
+                const pushedTeam =
+                  targetNode.isConqueredByWhite === 1 ? "white" : "black";
+
+                // Clear target position
+                this.buttons[toPosition].innerHTML = "";
+                this.buttons[toPosition].classList.remove("active");
+                this.buttons[toPosition].dataset.active = "false";
+                this.tree[toPosition].pasukanGambar = null;
+                this.tree[toPosition].pasukanID = null;
+                this.tree[toPosition].isConqueredByWhite = 0;
+                this.tree[toPosition].isConqueredByBlack = 0;
+
+                // Place pushed character at push position
+                this.placeCharacterAtPosition(
+                  pushedCharacter,
+                  pushPos,
+                  pushedTeam
+                );
+
+                // Now move cogneur to target position
+                this.buttons[fromPosition].innerHTML = "";
+                this.buttons[fromPosition].classList.remove(
+                  "active",
+                  "selected-character"
+                );
+                this.buttons[fromPosition].dataset.active = "false";
+                this.tree[fromPosition].pasukanGambar = null;
+                this.tree[fromPosition].pasukanID = null;
+                this.tree[fromPosition].isConqueredByWhite = 0;
+                this.tree[fromPosition].isConqueredByBlack = 0;
+
+                this.placeCharacterAtPosition(character, toPosition, team);
+
+                return true;
+              }
+            }
+            break;
+          }
+        }
+      }
+
+      // CLAW LAUNCHER - Drag character
+      if (character.id === 7) {
+        // Find if there's a character to drag
+        const allLines = [
+          ...HexagonalBoard.lines.vertical,
+          ...HexagonalBoard.lines.diagonalTopLeft,
+          ...HexagonalBoard.lines.diagonalTopRight,
+        ];
+
+        for (const line of allLines) {
+          const fromIndex = line.indexOf(fromPosition);
+          const toIndex = line.indexOf(toPosition);
+
+          if (fromIndex !== -1 && toIndex !== -1) {
+            // Check if there's a character beyond toPosition
+            const direction = toIndex > fromIndex ? 1 : -1;
+            let characterToDrag = null;
+            let dragFromPos = null;
+
+            for (
+              let i = toIndex + direction;
+              direction > 0 ? i < line.length : i >= 0;
+              i += direction
+            ) {
+              const checkPos = line[i];
+              if (this.tree[checkPos].pasukanID !== null) {
+                characterToDrag = characters.find(
+                  (c) => c.id === this.tree[checkPos].pasukanID
+                );
+                const dragTeam =
+                  this.tree[checkPos].isConqueredByWhite === 1
+                    ? "white"
+                    : "black";
+                dragFromPos = checkPos;
+
+                // Clear dragged character's original position
+                this.buttons[checkPos].innerHTML = "";
+                this.buttons[checkPos].classList.remove("active");
+                this.buttons[checkPos].dataset.active = "false";
+                this.tree[checkPos].pasukanGambar = null;
+                this.tree[checkPos].pasukanID = null;
+                this.tree[checkPos].isConqueredByWhite = 0;
+                this.tree[checkPos].isConqueredByBlack = 0;
+
+                // Place dragged character at toPosition
+                this.placeCharacterAtPosition(
+                  characterToDrag,
+                  toPosition,
+                  dragTeam
+                );
+                break;
+              }
+            }
+
+            // If no character was dragged, toPosition should be empty for claw launcher to move there
+            break;
+          }
+        }
+      }
+
+      // MANIPULATOR - Move enemy character
+      if (character.id === 8) {
+        // Find the enemy character in line of sight
+        const allLines = [
+          ...HexagonalBoard.lines.vertical,
+          ...HexagonalBoard.lines.diagonalTopLeft,
+          ...HexagonalBoard.lines.diagonalTopRight,
+        ];
+
+        for (const line of allLines) {
+          const fromIndex = line.indexOf(fromPosition);
+
+          if (fromIndex !== -1) {
+            for (let i = 0; i < line.length; i++) {
+              if (i === fromIndex) continue;
+
+              const enemyPos = line[i];
+              const enemyNode = this.tree[enemyPos];
+
+              if (enemyNode.pasukanID !== null) {
+                const isEnemy =
+                  (team === "white" && enemyNode.isConqueredByBlack === 1) ||
+                  (team === "black" && enemyNode.isConqueredByWhite === 1);
+
+                if (isEnemy) {
+                  // Check if toPosition is adjacent to this enemy
+                  if (this.adjacencyMap[enemyPos].includes(toPosition)) {
+                    const enemyCharacter = characters.find(
+                      (c) => c.id === enemyNode.pasukanID
+                    );
+                    const enemyTeam =
+                      enemyNode.isConqueredByWhite === 1 ? "white" : "black";
+
+                    // Clear enemy's original position
+                    this.buttons[enemyPos].innerHTML = "";
+                    this.buttons[enemyPos].classList.remove("active");
+                    this.buttons[enemyPos].dataset.active = "false";
+                    this.tree[enemyPos].pasukanGambar = null;
+                    this.tree[enemyPos].pasukanID = null;
+                    this.tree[enemyPos].isConqueredByWhite = 0;
+                    this.tree[enemyPos].isConqueredByBlack = 0;
+
+                    // Place enemy at new position
+                    this.placeCharacterAtPosition(
+                      enemyCharacter,
+                      toPosition,
+                      enemyTeam
+                    );
+
+                    // Manipulator stays in place
+                    return true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // BREWMASTER - Move adjacent ally
+      if (character.id === 10) {
+        const adjacent = this.adjacencyMap[fromPosition];
+
+        for (const adjPos of adjacent) {
+          const adjNode = this.tree[adjPos];
+
+          if (adjNode.pasukanID !== null) {
+            const isAlly =
+              (team === "white" && adjNode.isConqueredByWhite === 1) ||
+              (team === "black" && adjNode.isConqueredByBlack === 1);
+
+            if (isAlly) {
+              // Check if toPosition is adjacent to this ally
+              if (this.adjacencyMap[adjPos].includes(toPosition)) {
+                const allyCharacter = characters.find(
+                  (c) => c.id === adjNode.pasukanID
+                );
+
+                // Clear ally's original position
+                this.buttons[adjPos].innerHTML = "";
+                this.buttons[adjPos].classList.remove("active");
+                this.buttons[adjPos].dataset.active = "false";
+                this.tree[adjPos].pasukanGambar = null;
+                this.tree[adjPos].pasukanID = null;
+                this.tree[adjPos].isConqueredByWhite = 0;
+                this.tree[adjPos].isConqueredByBlack = 0;
+
+                // Place ally at new position
+                this.placeCharacterAtPosition(allyCharacter, toPosition, team);
+
+                // Brewmaster stays in place
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Normal move (or special abilities that just move the character normally)
     this.buttons[fromPosition].innerHTML = "";
     this.buttons[fromPosition].classList.remove("active", "selected-character");
     this.buttons[fromPosition].dataset.active = "false";
@@ -847,31 +1230,25 @@ class HexagonalBoard {
     this.tree[fromPosition].isConqueredByWhite = 0;
     this.tree[fromPosition].isConqueredByBlack = 0;
 
-    // Place at new position
     this.placeCharacterAtPosition(character, toPosition, team);
 
     return true;
   }
 
-  // Highlight available move positions
   highlightMovePositions(positions) {
-    // Clear previous highlights
     this.buttons.forEach((btn) => btn.classList.remove("move-target"));
 
-    // Add highlight to available positions
     positions.forEach((pos) => {
       this.buttons[pos].classList.add("move-target");
     });
   }
 
-  // Clear all highlights
   clearHighlights() {
     this.buttons.forEach((btn) => {
       btn.classList.remove("move-target", "selected-character", "can-move");
     });
   }
 
-  // Highlight the current character that needs to move
   highlightCurrentCharacter() {
     this.clearHighlights();
 
@@ -882,11 +1259,11 @@ class HexagonalBoard {
     }
   }
 
-  // Update phase display
   updatePhaseDisplay() {
     const phaseNameEl = document.getElementById("phase-name");
     const moveCounterEl = document.getElementById("move-counter");
     const currentCharEl = document.getElementById("current-character");
+    const abilityToggle = document.getElementById("ability-toggle");
 
     if (phaseNameEl) {
       phaseNameEl.textContent = this.currentPhase.toUpperCase();
@@ -920,23 +1297,34 @@ class HexagonalBoard {
           "Select a card, then click a valid position";
       }
     }
+
+    // Show/hide ability toggle based on phase
+    if (abilityToggle) {
+      abilityToggle.style.display =
+        this.currentPhase === "move" ? "block" : "none";
+    }
   }
 
-  // Move to next character in the team
   moveToNextCharacter() {
     this.currentCharacterIndex++;
 
     if (this.currentCharacterIndex >= this.teamCharactersToMove.length) {
-      // All characters have moved, go to recruitment phase
       this.startRecruitmentPhase();
     } else {
-      // Highlight next character
       this.highlightCurrentCharacter();
       this.updatePhaseDisplay();
+
+      // Reset to special ability for next character
+      this.useSpecialAbility = true;
+      const useSpecialBtn = document.getElementById("use-special-btn");
+      const useNormalBtn = document.getElementById("use-normal-btn");
+      if (useSpecialBtn && useNormalBtn) {
+        useSpecialBtn.classList.add("active");
+        useNormalBtn.classList.remove("active");
+      }
     }
   }
 
-  // Start movement phase for current team
   startMovementPhase() {
     this.currentPhase = "move";
     this.teamCharactersToMove = this.getTeamCharacterPositions(
@@ -945,9 +1333,17 @@ class HexagonalBoard {
     this.currentCharacterIndex = 0;
     this.selectedCharacterPosition = null;
     this.movedCharacters.clear();
+    this.useSpecialAbility = true;
+
+    // Reset ability toggle buttons
+    const useSpecialBtn = document.getElementById("use-special-btn");
+    const useNormalBtn = document.getElementById("use-normal-btn");
+    if (useSpecialBtn && useNormalBtn) {
+      useSpecialBtn.classList.add("active");
+      useNormalBtn.classList.remove("active");
+    }
 
     if (this.teamCharactersToMove.length === 0) {
-      // No characters to move, skip to recruitment
       this.startRecruitmentPhase();
     } else {
       this.highlightCurrentCharacter();
@@ -955,16 +1351,13 @@ class HexagonalBoard {
     }
   }
 
-  // Start recruitment phase
   startRecruitmentPhase() {
     const currentRecruitmentTurns =
       this.currentTurn === "white"
         ? this.whiteRecruitmentTurns
         : this.blackRecruitmentTurns;
 
-    // Check if this team has already done all 4 recruitment turns
     if (currentRecruitmentTurns >= this.maxRecruitmentTurns) {
-      // Skip recruitment and go directly to next turn
       this.endTurn();
       return;
     }
@@ -990,7 +1383,6 @@ class HexagonalBoard {
   }
 
   handleMovePhaseClick(index) {
-    // Must click on the current character that needs to move
     if (this.currentCharacterIndex >= this.teamCharactersToMove.length) {
       alert("All characters have moved!");
       return;
@@ -1000,42 +1392,34 @@ class HexagonalBoard {
       this.teamCharactersToMove[this.currentCharacterIndex];
     const node = this.tree[index];
 
-    // Check if clicking on the current character
     if (index === expectedCharPos && node.pasukanID !== null) {
-      // Select this character
       this.clearHighlights();
       this.selectedCharacterPosition = index;
       this.buttons[index].classList.add("selected-character");
 
-      // Highlight available move positions (with special abilities)
-      const availableMoves = this.getSpecialMovePositions(index);
+      const availableMoves = this.getMovePositions(index);
       this.highlightMovePositions(availableMoves);
       this.updatePhaseDisplay();
     } else if (this.selectedCharacterPosition !== null) {
-      // Check if clicking on valid move target
-      const availableMoves = this.getSpecialMovePositions(
+      const availableMoves = this.getMovePositions(
         this.selectedCharacterPosition
       );
 
       if (availableMoves.includes(index)) {
-        // Execute move
         const fromPos = this.selectedCharacterPosition;
         this.moveCharacter(fromPos, index);
 
         this.selectedCharacterPosition = null;
         this.clearHighlights();
 
-        // Move to next character
         this.moveToNextCharacter();
       } else {
-        // Clicked somewhere invalid, deselect
         this.selectedCharacterPosition = null;
         this.clearHighlights();
         this.highlightCurrentCharacter();
         this.updatePhaseDisplay();
       }
     } else {
-      // Wrong character selected
       alert(`You must move the current character first!`);
     }
   }
@@ -1089,7 +1473,6 @@ class HexagonalBoard {
       this.placeHermitCub(this.currentTurn);
     }
 
-    // Increment recruitment turn counter for current team
     if (this.currentTurn === "white") {
       this.whiteRecruitmentTurns++;
     } else {
@@ -1106,23 +1489,19 @@ class HexagonalBoard {
     cardElements.forEach((card) => card.classList.remove("selected"));
     this.selectedCardIndex = null;
 
-    // End turn and switch to other player
     this.endTurn();
   }
 
   endTurn() {
-    // Switch to other player
     const previousTurn = this.currentTurn;
     this.currentTurn = this.currentTurn === "white" ? "black" : "white";
 
-    // If we've gone through both players, increment turn count
     if (this.currentTurn === "white") {
       this.turnCount++;
     }
 
     this.updateTurnDisplay();
 
-    // Start movement phase for new player
     this.startMovementPhase();
   }
 
@@ -1160,12 +1539,20 @@ class HexagonalBoard {
     this.currentCards = [null, null, null];
     this.selectedCardIndex = null;
 
-    // Reset movement tracking
     this.currentPhase = "move";
     this.teamCharactersToMove = [];
     this.currentCharacterIndex = 0;
     this.selectedCharacterPosition = null;
     this.movedCharacters.clear();
+    this.useSpecialAbility = true;
+
+    // Reset ability toggle buttons
+    const useSpecialBtn = document.getElementById("use-special-btn");
+    const useNormalBtn = document.getElementById("use-normal-btn");
+    if (useSpecialBtn && useNormalBtn) {
+      useSpecialBtn.classList.add("active");
+      useNormalBtn.classList.remove("active");
+    }
 
     this.placeLeaders();
     this.initializeCards();
