@@ -28,6 +28,13 @@ class HexagonalBoard {
     this.selectedCharacterPosition = null;
     this.movedCharacters = new Set();
     this.useSpecialAbility = true; // Default to special ability
+    this.useClawGrab = false; // Toggle for CLAW LAUNCHER grab vs pull
+
+    // NEMESIS tracking
+    this.nemesisMovesRemaining = 0;
+    this.isNemesisIntercept = false;
+    this.leaderMovedThisTurn = false;
+    this.nemesisTeam = null; // Track which team has NEMESIS
 
     this.init();
     this.displayGameInfo();
@@ -162,6 +169,11 @@ class HexagonalBoard {
     } else {
       this.tree[position].isConqueredByBlack = 1;
       this.tree[position].isConqueredByWhite = 0;
+    }
+
+    // Track if NEMESIS was placed
+    if (character.id === 18) {
+      this.nemesisTeam = team;
     }
   }
 
@@ -332,6 +344,10 @@ class HexagonalBoard {
           <button id="use-special-btn" class="ability-btn active">Use Special Ability</button>
           <button id="use-normal-btn" class="ability-btn">Normal Move (1 Space)</button>
         </div>
+        <div class="claw-toggle" id="claw-toggle" style="display: none;">
+          <button id="claw-pull-btn" class="claw-btn active">Pull</button>
+          <button id="claw-grab-btn" class="claw-btn">Grab</button>
+        </div>
       `;
 
       const turnIndicator = rightPanel.querySelector(".turn-indicator");
@@ -346,7 +362,6 @@ class HexagonalBoard {
         useSpecialBtn.classList.add("active");
         useNormalBtn.classList.remove("active");
 
-        // If a character is selected, update the highlights
         if (this.selectedCharacterPosition !== null) {
           this.clearHighlights();
           this.buttons[this.selectedCharacterPosition].classList.add(
@@ -364,7 +379,44 @@ class HexagonalBoard {
         useNormalBtn.classList.add("active");
         useSpecialBtn.classList.remove("active");
 
-        // If a character is selected, update the highlights
+        if (this.selectedCharacterPosition !== null) {
+          this.clearHighlights();
+          this.buttons[this.selectedCharacterPosition].classList.add(
+            "selected-character"
+          );
+          const availableMoves = this.getMovePositions(
+            this.selectedCharacterPosition
+          );
+          this.highlightMovePositions(availableMoves);
+        }
+      });
+
+      // CLAW LAUNCHER toggle
+      const clawPullBtn = document.getElementById("claw-pull-btn");
+      const clawGrabBtn = document.getElementById("claw-grab-btn");
+
+      clawPullBtn.addEventListener("click", () => {
+        this.useClawGrab = false;
+        clawPullBtn.classList.add("active");
+        clawGrabBtn.classList.remove("active");
+
+        if (this.selectedCharacterPosition !== null) {
+          this.clearHighlights();
+          this.buttons[this.selectedCharacterPosition].classList.add(
+            "selected-character"
+          );
+          const availableMoves = this.getMovePositions(
+            this.selectedCharacterPosition
+          );
+          this.highlightMovePositions(availableMoves);
+        }
+      });
+
+      clawGrabBtn.addEventListener("click", () => {
+        this.useClawGrab = true;
+        clawGrabBtn.classList.add("active");
+        clawPullBtn.classList.remove("active");
+
         if (this.selectedCharacterPosition !== null) {
           this.clearHighlights();
           this.buttons[this.selectedCharacterPosition].classList.add(
@@ -495,8 +547,21 @@ class HexagonalBoard {
     return null;
   }
 
+  getNemesisPosition(team) {
+    for (let i = 0; i < this.tree.length; i++) {
+      if (this.tree[i].pasukanID === 18) {
+        const nemesisTeam =
+          this.tree[i].isConqueredByWhite === 1 ? "white" : "black";
+        if (nemesisTeam === team) {
+          return i;
+        }
+      }
+    }
+    return null;
+  }
+
   // Movement Ability
-  // FIXED: ACROBAT - Now allows 2 jumps, must have adjacent enemy/ally
+  // FIXED: ACROBAT - Now allows 2 jumps over ANY character (ally or enemy) using all line types
   getAcrobatMoves(characterPos, team) {
     const moves = new Set();
 
@@ -507,25 +572,49 @@ class HexagonalBoard {
     ) => {
       if (jumpsRemaining === 0) return;
 
-      const adjacent = this.adjacencyMap[currentPos];
-      for (const adjPos of adjacent) {
-        const adjNode = this.tree[adjPos];
-        // Must have a character (enemy or ally) to jump over
-        if (adjNode.pasukanID !== null) {
-          const direction = adjPos - currentPos;
-          const nextPos = adjPos + direction;
+      // Check all line types
+      const allLines = [
+        ...HexagonalBoard.lines.vertical,
+        ...HexagonalBoard.lines.diagonalTopLeft,
+        ...HexagonalBoard.lines.diagonalTopRight,
+      ];
 
-          if (nextPos >= 0 && nextPos < this.tree.length) {
-            if (this.adjacencyMap[adjPos].includes(nextPos)) {
-              const nextNode = this.tree[nextPos];
-              if (
-                nextNode.pasukanID === null &&
-                !visitedPositions.has(nextPos)
-              ) {
-                moves.add(nextPos);
-                const newVisited = new Set(visitedPositions);
-                newVisited.add(nextPos);
-                addJumps(nextPos, jumpsRemaining - 1, newVisited);
+      for (const line of allLines) {
+        const index = line.indexOf(currentPos);
+        if (index === -1) continue;
+
+        // Check both directions in this line
+        for (const direction of [-1, 1]) {
+          const adjacentIndex = index + direction;
+          if (adjacentIndex < 0 || adjacentIndex >= line.length) continue;
+
+          const adjPos = line[adjacentIndex];
+
+          // Must be actually adjacent (not just in same line)
+          if (!this.adjacencyMap[currentPos].includes(adjPos)) continue;
+
+          const adjNode = this.tree[adjPos];
+
+          // Must have a character (any character) to jump over
+          if (adjNode.pasukanID !== null) {
+            const landingIndex = adjacentIndex + direction;
+            if (landingIndex >= 0 && landingIndex < line.length) {
+              const landingPos = line[landingIndex];
+
+              // Must be adjacent to the jumped character
+              if (this.adjacencyMap[adjPos].includes(landingPos)) {
+                const landingNode = this.tree[landingPos];
+
+                // Landing position must be empty and not visited
+                if (
+                  landingNode.pasukanID === null &&
+                  !visitedPositions.has(landingPos)
+                ) {
+                  moves.add(landingPos);
+                  const newVisited = new Set(visitedPositions);
+                  newVisited.add(landingPos);
+                  addJumps(landingPos, jumpsRemaining - 1, newVisited);
+                }
               }
             }
           }
@@ -714,75 +803,97 @@ class HexagonalBoard {
     return Array.from(moves);
   }
 
-  // FIXED: CLAW LAUNCHER - Moves in front of visible character or drags them
+  // UPDATED: CLAW LAUNCHER - Pull self to target OR Grab target to self
   getClawLauncherMoves(characterPos, team) {
     const moves = new Set();
 
-    // Check all line types
-    const allLines = [
-      ...HexagonalBoard.lines.vertical,
-      ...HexagonalBoard.lines.diagonalTopLeft,
-      ...HexagonalBoard.lines.diagonalTopRight,
-    ];
+    if (!this.useClawGrab) {
+      // PULL MODE: Move in front of visible character
+      const allLines = [
+        ...HexagonalBoard.lines.vertical,
+        ...HexagonalBoard.lines.diagonalTopLeft,
+        ...HexagonalBoard.lines.diagonalTopRight,
+      ];
 
-    for (const line of allLines) {
-      const index = line.indexOf(characterPos);
-      if (index === -1) continue;
+      for (const line of allLines) {
+        const index = line.indexOf(characterPos);
+        if (index === -1) continue;
 
-      // Search forward
-      let firstCharacterForward = null;
-      for (let i = index + 1; i < line.length; i++) {
-        const pos = line[i];
-        const node = this.tree[pos];
+        // Search forward
+        let firstCharacterForward = null;
+        for (let i = index + 1; i < line.length; i++) {
+          const pos = line[i];
+          const node = this.tree[pos];
 
-        if (node.pasukanID !== null) {
-          firstCharacterForward = i;
-          break;
+          if (node.pasukanID !== null) {
+            firstCharacterForward = i;
+            break;
+          }
         }
-      }
 
-      if (firstCharacterForward !== null) {
-        const characterPos = line[firstCharacterForward];
-
-        // Can move to position right before the character (one space away)
-        if (firstCharacterForward === index + 1) {
-          // Character is immediately adjacent, can't move in front
-        } else {
+        if (
+          firstCharacterForward !== null &&
+          firstCharacterForward > index + 1
+        ) {
           moves.add(line[firstCharacterForward - 1]);
         }
 
-        // Can drag character to any empty position between current and character
-        for (let i = index + 1; i < firstCharacterForward; i++) {
-          if (this.tree[line[i]].pasukanID === null) {
-            moves.add(line[i]);
+        // Search backward
+        let firstCharacterBackward = null;
+        for (let i = index - 1; i >= 0; i--) {
+          const pos = line[i];
+          const node = this.tree[pos];
+
+          if (node.pasukanID !== null) {
+            firstCharacterBackward = i;
+            break;
           }
         }
-      }
 
-      // Search backward
-      let firstCharacterBackward = null;
-      for (let i = index - 1; i >= 0; i--) {
-        const pos = line[i];
-        const node = this.tree[pos];
-
-        if (node.pasukanID !== null) {
-          firstCharacterBackward = i;
-          break;
-        }
-      }
-
-      if (firstCharacterBackward !== null) {
-        // Can move to position right before the character (one space away)
-        if (firstCharacterBackward === index - 1) {
-          // Character is immediately adjacent, can't move in front
-        } else {
+        if (
+          firstCharacterBackward !== null &&
+          firstCharacterBackward < index - 1
+        ) {
           moves.add(line[firstCharacterBackward + 1]);
         }
+      }
+    } else {
+      // GRAB MODE: Target adjacent to where claw launcher can see a character
+      const allLines = [
+        ...HexagonalBoard.lines.vertical,
+        ...HexagonalBoard.lines.diagonalTopLeft,
+        ...HexagonalBoard.lines.diagonalTopRight,
+      ];
 
-        // Can drag character to any empty position between current and character
-        for (let i = index - 1; i > firstCharacterBackward; i--) {
-          if (this.tree[line[i]].pasukanID === null) {
-            moves.add(line[i]);
+      for (const line of allLines) {
+        const index = line.indexOf(characterPos);
+        if (index === -1) continue;
+
+        // Search forward for a character to grab
+        for (let i = index + 1; i < line.length; i++) {
+          const pos = line[i];
+          const node = this.tree[pos];
+
+          if (node.pasukanID !== null) {
+            // Position right next to claw launcher towards the target
+            if (i > index + 1) {
+              moves.add(line[index + 1]);
+            }
+            break;
+          }
+        }
+
+        // Search backward for a character to grab
+        for (let i = index - 1; i >= 0; i--) {
+          const pos = line[i];
+          const node = this.tree[pos];
+
+          if (node.pasukanID !== null) {
+            // Position right next to claw launcher towards the target
+            if (i < index - 1) {
+              moves.add(line[index - 1]);
+            }
+            break;
           }
         }
       }
@@ -791,9 +902,10 @@ class HexagonalBoard {
     return Array.from(moves);
   }
 
-  // FIXED: MANIPULATOR - Moves enemy in line of sight to adjacent empty space
+  // FIXED: MANIPULATOR - Moves enemy in line of sight to adjacent empty space (NOT adjacent to manipulator)
   getManipulatorMoves(characterPos, team) {
     const moves = new Set();
+    const manipulatorAdjacent = this.adjacencyMap[characterPos];
 
     // Check all line types
     const allLines = [
@@ -813,8 +925,11 @@ class HexagonalBoard {
         const targetPos = line[i];
         const targetNode = this.tree[targetPos];
 
-        // Must have an enemy character
-        if (targetNode.pasukanID !== null) {
+        // Must have an enemy character and NOT be adjacent to manipulator
+        if (
+          targetNode.pasukanID !== null &&
+          !manipulatorAdjacent.includes(targetPos)
+        ) {
           const isEnemy =
             (team === "white" && targetNode.isConqueredByBlack === 1) ||
             (team === "black" && targetNode.isConqueredByWhite === 1);
@@ -945,7 +1060,7 @@ class HexagonalBoard {
     return this.getAvailableMovePositions(position).length > 0;
   }
 
-  // UPDATED: moveCharacter to handle special abilities properly
+  // UPDATED: moveCharacter to handle special abilities properly and update positions
   moveCharacter(fromPosition, toPosition) {
     const node = this.tree[fromPosition];
     const character = characters.find((c) => c.id === node.pasukanID);
@@ -1062,62 +1177,89 @@ class HexagonalBoard {
         }
       }
 
-      // CLAW LAUNCHER - Drag character
+      // CLAW LAUNCHER - Pull self or Grab target
       if (character.id === 7) {
-        // Find if there's a character to drag
-        const allLines = [
-          ...HexagonalBoard.lines.vertical,
-          ...HexagonalBoard.lines.diagonalTopLeft,
-          ...HexagonalBoard.lines.diagonalTopRight,
-        ];
+        if (!this.useClawGrab) {
+          // PULL MODE: Claw launcher moves to position
+          this.buttons[fromPosition].innerHTML = "";
+          this.buttons[fromPosition].classList.remove(
+            "active",
+            "selected-character"
+          );
+          this.buttons[fromPosition].dataset.active = "false";
+          this.tree[fromPosition].pasukanGambar = null;
+          this.tree[fromPosition].pasukanID = null;
+          this.tree[fromPosition].isConqueredByWhite = 0;
+          this.tree[fromPosition].isConqueredByBlack = 0;
 
-        for (const line of allLines) {
-          const fromIndex = line.indexOf(fromPosition);
-          const toIndex = line.indexOf(toPosition);
+          this.placeCharacterAtPosition(character, toPosition, team);
+          return true;
+        } else {
+          // GRAB MODE: Target moves to position next to claw launcher
+          const allLines = [
+            ...HexagonalBoard.lines.vertical,
+            ...HexagonalBoard.lines.diagonalTopLeft,
+            ...HexagonalBoard.lines.diagonalTopRight,
+          ];
 
-          if (fromIndex !== -1 && toIndex !== -1) {
-            // Check if there's a character beyond toPosition
-            const direction = toIndex > fromIndex ? 1 : -1;
-            let characterToDrag = null;
-            let dragFromPos = null;
+          for (const line of allLines) {
+            const fromIndex = line.indexOf(fromPosition);
+            const toIndex = line.indexOf(toPosition);
 
-            for (
-              let i = toIndex + direction;
-              direction > 0 ? i < line.length : i >= 0;
-              i += direction
-            ) {
-              const checkPos = line[i];
-              if (this.tree[checkPos].pasukanID !== null) {
-                characterToDrag = characters.find(
-                  (c) => c.id === this.tree[checkPos].pasukanID
-                );
-                const dragTeam =
-                  this.tree[checkPos].isConqueredByWhite === 1
-                    ? "white"
-                    : "black";
-                dragFromPos = checkPos;
+            if (fromIndex !== -1 && toIndex !== -1) {
+              // Find the target character
+              let targetCharPos = null;
+              let direction = 0;
 
-                // Clear dragged character's original position
-                this.buttons[checkPos].innerHTML = "";
-                this.buttons[checkPos].classList.remove("active");
-                this.buttons[checkPos].dataset.active = "false";
-                this.tree[checkPos].pasukanGambar = null;
-                this.tree[checkPos].pasukanID = null;
-                this.tree[checkPos].isConqueredByWhite = 0;
-                this.tree[checkPos].isConqueredByBlack = 0;
-
-                // Place dragged character at toPosition
-                this.placeCharacterAtPosition(
-                  characterToDrag,
-                  toPosition,
-                  dragTeam
-                );
-                break;
+              if (toIndex > fromIndex) {
+                // Search forward from claw
+                direction = 1;
+                for (let i = fromIndex + 1; i < line.length; i++) {
+                  if (this.tree[line[i]].pasukanID !== null) {
+                    targetCharPos = line[i];
+                    break;
+                  }
+                }
+              } else {
+                // Search backward from claw
+                direction = -1;
+                for (let i = fromIndex - 1; i >= 0; i--) {
+                  if (this.tree[line[i]].pasukanID !== null) {
+                    targetCharPos = line[i];
+                    break;
+                  }
+                }
               }
-            }
 
-            // If no character was dragged, toPosition should be empty for claw launcher to move there
-            break;
+              if (targetCharPos !== null) {
+                const targetCharNode = this.tree[targetCharPos];
+                const targetCharacter = characters.find(
+                  (c) => c.id === targetCharNode.pasukanID
+                );
+                const targetCharTeam =
+                  targetCharNode.isConqueredByWhite === 1 ? "white" : "black";
+
+                // Clear target's original position
+                this.buttons[targetCharPos].innerHTML = "";
+                this.buttons[targetCharPos].classList.remove("active");
+                this.buttons[targetCharPos].dataset.active = "false";
+                this.tree[targetCharPos].pasukanGambar = null;
+                this.tree[targetCharPos].pasukanID = null;
+                this.tree[targetCharPos].isConqueredByWhite = 0;
+                this.tree[targetCharPos].isConqueredByBlack = 0;
+
+                // Place target at toPosition (next to claw launcher)
+                this.placeCharacterAtPosition(
+                  targetCharacter,
+                  toPosition,
+                  targetCharTeam
+                );
+
+                // Claw launcher stays in place
+                return true;
+              }
+              break;
+            }
           }
         }
       }
@@ -1264,17 +1406,29 @@ class HexagonalBoard {
     const moveCounterEl = document.getElementById("move-counter");
     const currentCharEl = document.getElementById("current-character");
     const abilityToggle = document.getElementById("ability-toggle");
+    const clawToggle = document.getElementById("claw-toggle");
 
     if (phaseNameEl) {
-      phaseNameEl.textContent = this.currentPhase.toUpperCase();
-      phaseNameEl.className = `phase-name ${this.currentPhase}`;
+      if (this.isNemesisIntercept) {
+        phaseNameEl.textContent = "NEMESIS INTERCEPT";
+        phaseNameEl.className = "phase-name nemesis";
+      } else {
+        phaseNameEl.textContent = this.currentPhase.toUpperCase();
+        phaseNameEl.className = `phase-name ${this.currentPhase}`;
+      }
     }
 
     if (moveCounterEl) {
       if (this.currentPhase === "move") {
-        const totalCharacters = this.teamCharactersToMove.length;
-        const currentCharNum = this.currentCharacterIndex + 1;
-        moveCounterEl.textContent = `Character ${currentCharNum} of ${totalCharacters}`;
+        if (this.isNemesisIntercept) {
+          moveCounterEl.textContent = `Intercept Move ${
+            3 - this.nemesisMovesRemaining
+          } of 2`;
+        } else {
+          const totalCharacters = this.teamCharactersToMove.length;
+          const currentCharNum = this.currentCharacterIndex + 1;
+          moveCounterEl.textContent = `Character ${currentCharNum} of ${totalCharacters}`;
+        }
       } else {
         moveCounterEl.textContent = "Recruitment Phase";
       }
@@ -1282,7 +1436,11 @@ class HexagonalBoard {
 
     if (currentCharEl) {
       if (this.currentPhase === "move") {
-        if (this.currentCharacterIndex < this.teamCharactersToMove.length) {
+        if (this.isNemesisIntercept) {
+          currentCharEl.textContent = `NEMESIS is intercepting! (${this.nemesisMovesRemaining} moves remaining)`;
+        } else if (
+          this.currentCharacterIndex < this.teamCharactersToMove.length
+        ) {
           const charPos = this.teamCharactersToMove[this.currentCharacterIndex];
           const charId = this.tree[charPos].pasukanID;
           const character = characters.find((c) => c.id === charId);
@@ -1298,17 +1456,61 @@ class HexagonalBoard {
       }
     }
 
-    // Show/hide ability toggle based on phase
+    // Show/hide ability toggle based on phase and NEMESIS intercept
     if (abilityToggle) {
       abilityToggle.style.display =
-        this.currentPhase === "move" ? "block" : "none";
+        this.currentPhase === "move" && !this.isNemesisIntercept
+          ? "block"
+          : "none";
+    }
+
+    // Show CLAW LAUNCHER toggle only if current character is CLAW LAUNCHER
+    if (clawToggle) {
+      if (
+        this.currentPhase === "move" &&
+        !this.isNemesisIntercept &&
+        this.currentCharacterIndex < this.teamCharactersToMove.length
+      ) {
+        const charPos = this.teamCharactersToMove[this.currentCharacterIndex];
+        const charId = this.tree[charPos].pasukanID;
+        clawToggle.style.display = charId === 7 ? "block" : "none";
+      } else {
+        clawToggle.style.display = "none";
+      }
     }
   }
 
   moveToNextCharacter() {
     this.currentCharacterIndex++;
 
+    // Check if we've just finished moving all regular characters
     if (this.currentCharacterIndex >= this.teamCharactersToMove.length) {
+      // Check if last moved character was the leader
+      const lastCharPos =
+        this.teamCharactersToMove[this.teamCharactersToMove.length - 1];
+      const lastCharId = this.tree[lastCharPos].pasukanID;
+      const lastCharIsLeader = lastCharId === 19 || lastCharId === 1;
+
+      // Check if the other team has NEMESIS and it belongs to them
+      const enemyTeam = this.currentTurn === "white" ? "black" : "white";
+      const nemesisPos = this.getNemesisPosition(enemyTeam);
+
+      if (
+        lastCharIsLeader &&
+        nemesisPos !== null &&
+        this.nemesisTeam === enemyTeam
+      ) {
+        // Trigger NEMESIS intercept
+        this.isNemesisIntercept = true;
+        this.nemesisMovesRemaining = 2;
+        this.teamCharactersToMove = [nemesisPos, nemesisPos];
+        this.currentCharacterIndex = 0;
+        this.highlightCurrentCharacter();
+        this.updatePhaseDisplay();
+        return;
+      }
+
+      // No NEMESIS intercept, proceed to recruitment
       this.startRecruitmentPhase();
     } else {
       this.highlightCurrentCharacter();
@@ -1316,31 +1518,52 @@ class HexagonalBoard {
 
       // Reset to special ability for next character
       this.useSpecialAbility = true;
+      this.useClawGrab = false;
       const useSpecialBtn = document.getElementById("use-special-btn");
       const useNormalBtn = document.getElementById("use-normal-btn");
+      const clawPullBtn = document.getElementById("claw-pull-btn");
+      const clawGrabBtn = document.getElementById("claw-grab-btn");
       if (useSpecialBtn && useNormalBtn) {
         useSpecialBtn.classList.add("active");
         useNormalBtn.classList.remove("active");
+      }
+      if (clawPullBtn && clawGrabBtn) {
+        clawPullBtn.classList.add("active");
+        clawGrabBtn.classList.remove("active");
       }
     }
   }
 
   startMovementPhase() {
     this.currentPhase = "move";
-    this.teamCharactersToMove = this.getTeamCharacterPositions(
-      this.currentTurn
-    );
+    // Get fresh character positions each time and exclude NEMESIS from normal turn
+    let allCharacters = this.getTeamCharacterPositions(this.currentTurn);
+
+    // Filter out NEMESIS from regular movement
+    this.teamCharactersToMove = allCharacters.filter((pos) => {
+      return this.tree[pos].pasukanID !== 18;
+    });
+
     this.currentCharacterIndex = 0;
     this.selectedCharacterPosition = null;
     this.movedCharacters.clear();
     this.useSpecialAbility = true;
+    this.useClawGrab = false;
+    this.isNemesisIntercept = false;
+    this.nemesisMovesRemaining = 0;
 
     // Reset ability toggle buttons
     const useSpecialBtn = document.getElementById("use-special-btn");
     const useNormalBtn = document.getElementById("use-normal-btn");
+    const clawPullBtn = document.getElementById("claw-pull-btn");
+    const clawGrabBtn = document.getElementById("claw-grab-btn");
     if (useSpecialBtn && useNormalBtn) {
       useSpecialBtn.classList.add("active");
       useNormalBtn.classList.remove("active");
+    }
+    if (clawPullBtn && clawGrabBtn) {
+      clawPullBtn.classList.add("active");
+      clawGrabBtn.classList.remove("active");
     }
 
     if (this.teamCharactersToMove.length === 0) {
@@ -1407,12 +1630,51 @@ class HexagonalBoard {
 
       if (availableMoves.includes(index)) {
         const fromPos = this.selectedCharacterPosition;
+        const movingCharId = this.tree[fromPos].pasukanID;
+
         this.moveCharacter(fromPos, index);
 
         this.selectedCharacterPosition = null;
         this.clearHighlights();
 
-        this.moveToNextCharacter();
+        if (this.isNemesisIntercept) {
+          this.nemesisMovesRemaining--;
+          if (this.nemesisMovesRemaining === 0) {
+            this.isNemesisIntercept = false;
+            this.startRecruitmentPhase();
+          } else {
+            this.currentCharacterIndex++;
+            // GET UPDATED NEMESIS POSITION FOR NEXT MOVE
+            const enemyTeam = this.currentTurn === "white" ? "black" : "white";
+            const updatedNemesisPos = this.getNemesisPosition(enemyTeam);
+            this.teamCharactersToMove[this.currentCharacterIndex] =
+              updatedNemesisPos;
+            this.highlightCurrentCharacter();
+            this.updatePhaseDisplay();
+          }
+        } else {
+          // CHECK FOR NEMESIS INTERCEPT IMMEDIATELY AFTER THIS MOVE
+          const isLeader = movingCharId === 19 || movingCharId === 1;
+          const enemyTeam = this.currentTurn === "white" ? "black" : "white";
+          const nemesisPos = this.getNemesisPosition(enemyTeam);
+
+          if (
+            isLeader &&
+            nemesisPos !== null &&
+            this.nemesisTeam === enemyTeam
+          ) {
+            // TRIGGER NEMESIS INTERCEPT NOW
+            this.isNemesisIntercept = true;
+            this.nemesisMovesRemaining = 2;
+            this.teamCharactersToMove = [nemesisPos, nemesisPos];
+            this.currentCharacterIndex = 0;
+            this.highlightCurrentCharacter();
+            this.updatePhaseDisplay();
+            return;
+          }
+
+          this.moveToNextCharacter();
+        }
       } else {
         this.selectedCharacterPosition = null;
         this.clearHighlights();
@@ -1423,7 +1685,6 @@ class HexagonalBoard {
       alert(`You must move the current character first!`);
     }
   }
-
   handleRecruitPhaseClick(index) {
     if (this.selectedCardIndex === null) {
       return;
@@ -1545,13 +1806,23 @@ class HexagonalBoard {
     this.selectedCharacterPosition = null;
     this.movedCharacters.clear();
     this.useSpecialAbility = true;
+    this.useClawGrab = false;
+    this.isNemesisIntercept = false;
+    this.nemesisMovesRemaining = 0;
+    this.nemesisTeam = null;
 
     // Reset ability toggle buttons
     const useSpecialBtn = document.getElementById("use-special-btn");
     const useNormalBtn = document.getElementById("use-normal-btn");
+    const clawPullBtn = document.getElementById("claw-pull-btn");
+    const clawGrabBtn = document.getElementById("claw-grab-btn");
     if (useSpecialBtn && useNormalBtn) {
       useSpecialBtn.classList.add("active");
       useNormalBtn.classList.remove("active");
+    }
+    if (clawPullBtn && clawGrabBtn) {
+      clawPullBtn.classList.add("active");
+      clawGrabBtn.classList.remove("active");
     }
 
     this.placeLeaders();
