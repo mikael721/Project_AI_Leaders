@@ -1108,6 +1108,11 @@ class HexagonalBoard {
           targetTeam
         );
 
+        // ASSASSIN passive check after move
+        if (character.id === 12) {
+          this.checkAssassinKill(toPosition);
+        }
+
         return true;
       }
 
@@ -1168,6 +1173,19 @@ class HexagonalBoard {
                 this.tree[fromPosition].isConqueredByBlack = 0;
 
                 this.placeCharacterAtPosition(character, toPosition, team);
+
+                // ARCHER support check after LEADER move
+                if (character.id === 1 || character.id === 19) {
+                  this.checkArcherSupportCapture(toPosition);
+                }
+
+                // ARCHER movement may enable capture
+                if (character.id === 11) {
+                  const myLeaderPos = this.getLeaderPosition(this.currentTurn);
+                  if (myLeaderPos !== null) {
+                    this.checkArcherSupportCapture(myLeaderPos);
+                  }
+                }
 
                 return true;
               }
@@ -1618,6 +1636,13 @@ class HexagonalBoard {
     if (index === expectedCharPos && node.pasukanID !== null) {
       this.clearHighlights();
       this.selectedCharacterPosition = index;
+
+      // ASSASSIN passive kill check when selected (!!! rubah klo ngak sesuai ini logic kill assasin)
+      const selectedCharId = node.pasukanID;
+      if (selectedCharId === 12) {
+        this.checkAssassinKill(index);
+      }
+      
       this.buttons[index].classList.add("selected-character");
 
       const availableMoves = this.getMovePositions(index);
@@ -1685,6 +1710,7 @@ class HexagonalBoard {
       alert(`You must move the current character first!`);
     }
   }
+
   handleRecruitPhaseClick(index) {
     if (this.selectedCardIndex === null) {
       return;
@@ -1847,6 +1873,102 @@ class HexagonalBoard {
   getTreeNode(index) {
     return this.tree[index];
   }
+
+  // ===== ASSASSIN PASSIVE ABILITY =====
+  checkAssassinKill(assassinPos) {
+    const assassinNode = this.tree[assassinPos];
+    if (!assassinNode || assassinNode.pasukanID !== 12) return;
+
+    const assassinTeam =
+      assassinNode.isConqueredByWhite === 1 ? "white" : "black";
+
+    const adjacentPositions = this.adjacencyMap[assassinPos];
+
+    for (const pos of adjacentPositions) {
+      const node = this.tree[pos];
+      if (!node || node.pasukanID === null) continue;
+
+      const isLeader = node.pasukanID === 19 || node.pasukanID === 1;
+      if (!isLeader) continue;
+
+      const targetTeam =
+        node.isConqueredByWhite === 1 ? "white" : "black";
+
+      if (targetTeam !== assassinTeam) {
+        alert(
+          `${assassinTeam.toUpperCase()} MENANG!\nASSASSIN membunuh LEADER musuh`
+        );
+        location.reload();
+        return;
+      }
+    }
+  }
+
+  // ===== ARCHER SUPPORT ABILITY =====
+  checkArcherSupportCapture(movedLeaderPos) {
+    console.log("Test");
+    const movedLeaderNode = this.tree[movedLeaderPos];
+    if (!movedLeaderNode) return;
+
+    const isLeader =
+      movedLeaderNode.pasukanID === 1 || movedLeaderNode.pasukanID === 19;
+    if (!isLeader) return;
+
+    const leaderTeam =
+      movedLeaderNode.isConqueredByWhite === 1 ? "white" : "black";
+    const enemyTeam = leaderTeam === "white" ? "black" : "white";
+
+    // 1️⃣ Cari Leader lawan yang ADJACENT
+    const adjacent = this.adjacencyMap[movedLeaderPos];
+    let enemyLeaderPos = null;
+
+    for (const pos of adjacent) {
+      const node = this.tree[pos];
+      if (
+        node &&
+        (node.pasukanID === 1 || node.pasukanID === 19)
+      ) {
+        const nodeTeam =
+          node.isConqueredByWhite === 1 ? "white" : "black";
+        if (nodeTeam === enemyTeam) {
+          enemyLeaderPos = pos;
+          break;
+        }
+      }
+    }
+
+    if (enemyLeaderPos === null) return;
+
+    // 2️⃣ Cari ARCHER jarak 2 dari LEADER LAWAN
+    const distance1 = this.adjacencyMap[enemyLeaderPos];
+    const distance2 = new Set();
+
+    for (const pos1 of distance1) {
+      for (const pos2 of this.adjacencyMap[pos1]) {
+        if (pos2 !== enemyLeaderPos) {
+          distance2.add(pos2);
+        }
+      }
+    }
+
+    for (const pos of distance2) {
+      const node = this.tree[pos];
+      if (!node || node.pasukanID !== 11) continue;
+
+      const archerTeam =
+        node.isConqueredByWhite === 1 ? "white" : "black";
+
+      if (archerTeam === leaderTeam) {
+        alert(
+          `${leaderTeam.toUpperCase()} MENANG!\nLeader didukung ARCHER`
+        );
+        location.reload();
+        return;
+      }
+    }
+  }
+
+
 
   traverseTree(startIndex, callback) {
     const visited = new Set();
