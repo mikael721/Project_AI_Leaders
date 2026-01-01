@@ -567,6 +567,27 @@ class HexagonalBoard {
     return false;
   }
 
+  // =========== UNTUK PROTECTOR ===================
+  isProtectedByProtector(targetPos, attackerTeam) {
+    const adjacent = this.adjacencyMap[targetPos];
+
+    for (const pos of adjacent) {
+      const node = this.tree[pos];
+      if (!node || node.pasukanID !== 14) continue;
+
+      const protectorTeam =
+        node.isConqueredByWhite === 1 ? "white" : "black";
+
+      // Protector only blocks ENEMY abilities
+      if (protectorTeam !== attackerTeam) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+
   getNemesisPosition(team) {
     for (let i = 0; i < this.tree.length; i++) {
       if (this.tree[i].pasukanID === 18) {
@@ -1283,6 +1304,12 @@ class HexagonalBoard {
               }
 
               if (targetCharPos !== null) {
+
+                // PROTECTOR CHECK (block grab)
+                if (this.isProtectedByProtector(targetCharPos, team)) {
+                  return false;
+                }
+
                 const targetCharNode = this.tree[targetCharPos];
                 const targetCharacter = characters.find(
                   (c) => c.id === targetCharNode.pasukanID
@@ -1332,6 +1359,11 @@ class HexagonalBoard {
               if (i === fromIndex) continue;
 
               const enemyPos = line[i];
+              // PROTECTOR CHECK (block manipulation)
+              if (this.isProtectedByProtector(enemyPos, team)) {
+                return false;
+              }
+
               const enemyNode = this.tree[enemyPos];
 
               if (enemyNode.pasukanID !== null) {
@@ -1387,6 +1419,10 @@ class HexagonalBoard {
               (team === "black" && adjNode.isConqueredByBlack === 1);
 
             if (isAlly) {
+              // PROTECTOR CHECK (block ally move)
+              if (this.isProtectedByProtector(adjPos, team)) {
+                return false;
+              }
               // Check if toPosition is adjacent to this ally
               if (this.adjacencyMap[adjPos].includes(toPosition)) {
                 const allyCharacter = characters.find(
