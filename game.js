@@ -547,6 +547,26 @@ class HexagonalBoard {
     return null;
   }
 
+  // =========== UNTUK JAILER ===================
+  isJailed(characterPos, team) {
+    const adjacent = this.adjacencyMap[characterPos];
+
+    for (const pos of adjacent) {
+      const node = this.tree[pos];
+      if (!node || node.pasukanID !== 13) continue;
+
+      const jailerTeam =
+        node.isConqueredByWhite === 1 ? "white" : "black";
+
+      // Only enemy jailer affects you
+      if (jailerTeam !== team) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   getNemesisPosition(team) {
     for (let i = 0; i < this.tree.length; i++) {
       if (this.tree[i].pasukanID === 18) {
@@ -1024,6 +1044,19 @@ class HexagonalBoard {
 
   // New method to get moves based on current ability toggle
   getMovePositions(characterPos) {
+    const node = this.tree[characterPos];
+    if (!node || node.pasukanID === null) return [];
+    const team =node.isConqueredByWhite === 1 ? "white" : "black";
+    
+    // 🔒 JAILER CHECK
+    const jailed = this.isJailed(characterPos, team);
+    
+    if (jailed) {
+      // Force NORMAL MOVE ONLY
+      return this.getAvailableMovePositions(characterPos);
+    }
+
+    // Normal logic
     if (this.useSpecialAbility) {
       return this.getSpecialMovePositions(characterPos);
     } else {
@@ -1634,20 +1667,25 @@ class HexagonalBoard {
     const node = this.tree[index];
 
     if (index === expectedCharPos && node.pasukanID !== null) {
+      // 🔁 FULL RESET SELECTION STATE
+      this.selectedCharacterPosition = null;
       this.clearHighlights();
+
       this.selectedCharacterPosition = index;
 
-      // ASSASSIN passive kill check when selected (!!! rubah klo ngak sesuai ini logic kill assasin)
-      const selectedCharId = node.pasukanID;
-      if (selectedCharId === 12) {
+      // ASSASSIN passive (tetap)
+      if (node.pasukanID === 12) {
         this.checkAssassinKill(index);
       }
-      
-      this.buttons[index].classList.add("selected-character");
 
+      // 🔁 RE-EVALUATE JAILER STATE HERE
       const availableMoves = this.getMovePositions(index);
+
+      this.buttons[index].classList.add("selected-character");
       this.highlightMovePositions(availableMoves);
       this.updatePhaseDisplay();
+
+      return;
     } else if (this.selectedCharacterPosition !== null) {
       const availableMoves = this.getMovePositions(
         this.selectedCharacterPosition
@@ -1658,9 +1696,11 @@ class HexagonalBoard {
         const movingCharId = this.tree[fromPos].pasukanID;
 
         this.moveCharacter(fromPos, index);
-
         this.selectedCharacterPosition = null;
         this.clearHighlights();
+
+        // 🔁 Board changed → force ability re-evaluation
+        this.updatePhaseDisplay();
 
         if (this.isNemesisIntercept) {
           this.nemesisMovesRemaining--;
