@@ -1242,19 +1242,6 @@ class HexagonalBoard {
 
                 this.placeCharacterAtPosition(character, toPosition, team);
 
-                // ARCHER support check after LEADER move
-                if (character.id === 1 || character.id === 19) {
-                  this.checkArcherSupportCapture(toPosition);
-                }
-
-                // ARCHER movement may enable capture
-                if (character.id === 11) {
-                  const myLeaderPos = this.getLeaderPosition(this.currentTurn);
-                  if (myLeaderPos !== null) {
-                    this.checkArcherSupportCapture(myLeaderPos);
-                  }
-                }
-
                 return true;
               }
             }
@@ -1695,6 +1682,11 @@ class HexagonalBoard {
     this.updatePhaseDisplay();
   }
 
+  checkPostLeaderMoveEffects(leaderPos) {
+    // ARCHER SUPPORT
+    this.checkArcherSupportCapture(leaderPos);
+  }
+
   handleButtonClick(event) {
     const button = event.target.closest(".hex-button");
     if (!button) return;
@@ -1751,6 +1743,12 @@ class HexagonalBoard {
         this.moveCharacter(fromPos, index);
         this.selectedCharacterPosition = null;
         this.clearHighlights();
+
+        const isLeaders = movingCharId === 19 || movingCharId === 1;
+
+        if (isLeaders) {
+          this.checkPostLeaderMoveEffects(index);
+        }
 
         // ===== VIZIER CHECK (AFTER LEADER MOVE) =====
         const isLeader = movingCharId === 19 || movingCharId === 1;
