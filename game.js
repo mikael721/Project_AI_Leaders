@@ -601,6 +601,20 @@ class HexagonalBoard {
     return null;
   }
 
+  // =========== UNTUK VIZIER ===================
+  hasVizier(team) {
+    for (let i = 0; i < this.tree.length; i++) {
+      if (this.tree[i].pasukanID === 15) {
+        const vizierTeam =
+          this.tree[i].isConqueredByWhite === 1 ? "white" : "black";
+        if (vizierTeam === team) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   // Movement Ability
   // FIXED: ACROBAT - Now allows 2 jumps over ANY character (ally or enemy) using all line types
   getAcrobatMoves(characterPos, team) {
@@ -1634,10 +1648,13 @@ class HexagonalBoard {
     this.currentCharacterIndex = 0;
     this.selectedCharacterPosition = null;
     this.movedCharacters.clear();
+
     this.useSpecialAbility = true;
     this.useClawGrab = false;
     this.isNemesisIntercept = false;
     this.nemesisMovesRemaining = 0;
+    this.vizierBonusUsed = false; 
+
 
     // Reset ability toggle buttons
     const useSpecialBtn = document.getElementById("use-special-btn");
@@ -1735,6 +1752,19 @@ class HexagonalBoard {
         this.selectedCharacterPosition = null;
         this.clearHighlights();
 
+        // ===== VIZIER CHECK (AFTER LEADER MOVE) =====
+        const isLeader = movingCharId === 19 || movingCharId === 1;
+
+        if (isLeader && this.hasVizier(this.currentTurn) && !this.vizierBonusUsed) {
+          this.teamCharactersToMove.splice(
+            this.currentCharacterIndex + 1,
+            0,
+            index
+          );
+
+          this.vizierBonusUsed = true; 
+        }
+
         // 🔁 Board changed → force ability re-evaluation
         this.updatePhaseDisplay();
 
@@ -1775,6 +1805,7 @@ class HexagonalBoard {
           }
 
           this.moveToNextCharacter();
+
         }
       } else {
         this.selectedCharacterPosition = null;
