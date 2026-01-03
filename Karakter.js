@@ -69,7 +69,7 @@ export const characters = [
     fullart: "Full Art/LEADERS-COGNEUR.PNG",
     white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Cogneur.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Cogneur.png",
-    poin: 3,
+    poin: 1,
     isKing: false,
 
     tim: "white",
@@ -84,7 +84,7 @@ export const characters = [
       "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_GardeRoyal.png",
     black:
       "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_GardeRoyal.png",
-    poin: 3,
+    poin: 4,
     isKing: false,
 
     tim: "white",
@@ -100,7 +100,7 @@ export const characters = [
       "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Illusionniste.png",
     black:
       "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Illusionniste.png",
-    poin: 3,
+    poin: 7,
     isKing: false,
 
     tim: "white",
@@ -115,7 +115,7 @@ export const characters = [
       "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_LanceGrappin.png",
     black:
       "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_LanceGrappin.png",
-    poin: 3,
+    poin: 10,
     isKing: false,
 
     tim: "white",
@@ -241,7 +241,7 @@ export const characters = [
   // ============================
   {
     nama: "HERMIT",
-    ability: "Spawns Hermit + Cub. Both can move individually.",
+    ability: "Spawns Hermit with Cub. Both can move individually.",
     fullart: "Full Art/LEADERS-MaitreDesBetes.PNG",
     white:
       "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_VieilOurs.png",

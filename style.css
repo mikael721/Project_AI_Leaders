@@ -291,7 +291,10 @@ h1 {
   letter-spacing: 2px;
   margin-bottom: 8px;
 }
-
+.phase-name.nemesis {
+  color: #16a34a;
+  font-size: 1.2rem;
+}
 .phase-name.move {
   color: #4ade80;
   background: rgba(74, 222, 128, 0.1);

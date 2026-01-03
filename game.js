@@ -13,8 +13,8 @@ class HexagonalBoard {
     this.tree = [];
     this.currentTurn = "white";
     this.turnCount = 1;
-    this.whiteStartPositions = [30, 31, 32, 34, 35, 36];
-    this.blackStartPositions = [9, 4, 1, 3, 8, 15];
+    this.whiteStartPositions = [30, 31, 32, 33, 34, 35, 36];
+    this.blackStartPositions = [9, 4, 1, 3, 8, 15, 0];
     this.availableCharacters = this.getAvailableCharacters();
     this.currentCards = [null, null, null];
     this.whiteRecruitmentTurns = 0;
@@ -35,6 +35,8 @@ class HexagonalBoard {
     this.isNemesisIntercept = false;
     this.leaderMovedThisTurn = false;
     this.nemesisTeam = null; // Track which team has NEMESIS
+    this.characterIndexBeforeNemesis = 0; // Store position before NEMESIS interrupt
+    this.charactersToMoveBeforeNemesis = []; // Store character list before NEMESIS interrupt
 
     this.init();
     this.displayGameInfo();
@@ -555,8 +557,7 @@ class HexagonalBoard {
       const node = this.tree[pos];
       if (!node || node.pasukanID !== 13) continue;
 
-      const jailerTeam =
-        node.isConqueredByWhite === 1 ? "white" : "black";
+      const jailerTeam = node.isConqueredByWhite === 1 ? "white" : "black";
 
       // Only enemy jailer affects you
       if (jailerTeam !== team) {
@@ -575,8 +576,7 @@ class HexagonalBoard {
       const node = this.tree[pos];
       if (!node || node.pasukanID !== 14) continue;
 
-      const protectorTeam =
-        node.isConqueredByWhite === 1 ? "white" : "black";
+      const protectorTeam = node.isConqueredByWhite === 1 ? "white" : "black";
 
       // Protector only blocks ENEMY abilities
       if (protectorTeam !== attackerTeam) {
@@ -586,7 +586,6 @@ class HexagonalBoard {
 
     return false;
   }
-
 
   getNemesisPosition(team) {
     for (let i = 0; i < this.tree.length; i++) {
@@ -1081,11 +1080,11 @@ class HexagonalBoard {
   getMovePositions(characterPos) {
     const node = this.tree[characterPos];
     if (!node || node.pasukanID === null) return [];
-    const team =node.isConqueredByWhite === 1 ? "white" : "black";
-    
+    const team = node.isConqueredByWhite === 1 ? "white" : "black";
+
     // 🔒 JAILER CHECK
     const jailed = this.isJailed(characterPos, team);
-    
+
     if (jailed) {
       // Force NORMAL MOVE ONLY
       return this.getAvailableMovePositions(characterPos);
@@ -1128,6 +1127,17 @@ class HexagonalBoard {
     return this.getAvailableMovePositions(position).length > 0;
   }
 
+  // NEW: Update character positions after displacement abilities
+  updateCharacterPositionsAfterDisplacement() {
+    // Get fresh positions for all team characters
+    const updatedPositions = this.getTeamCharacterPositions(this.currentTurn);
+
+    // Filter out NEMESIS from regular movement
+    this.teamCharactersToMove = updatedPositions.filter((pos) => {
+      return this.tree[pos].pasukanID !== 18;
+    });
+  }
+
   // UPDATED: moveCharacter to handle special abilities properly and update positions
   moveCharacter(fromPosition, toPosition) {
     const node = this.tree[fromPosition];
@@ -1137,6 +1147,8 @@ class HexagonalBoard {
 
     const team = node.isConqueredByWhite === 1 ? "white" : "black";
     const targetNode = this.tree[toPosition];
+
+    let positionsChanged = false; // Track if any character was displaced
 
     // Handle special abilities that involve other characters
     if (this.useSpecialAbility) {
@@ -1176,9 +1188,21 @@ class HexagonalBoard {
           targetTeam
         );
 
+        positionsChanged = true; // Positions changed
+
+        // FIXED: Immediately update the Illusionist's position in teamCharactersToMove
+        if (this.currentCharacterIndex < this.teamCharactersToMove.length) {
+          this.teamCharactersToMove[this.currentCharacterIndex] = toPosition;
+        }
+
         // ASSASSIN passive check after move
         if (character.id === 12) {
           this.checkAssassinKill(toPosition);
+        }
+
+        // Update positions if displacement occurred
+        if (positionsChanged) {
+          this.updateCharacterPositionsAfterDisplacement();
         }
 
         return true;
@@ -1228,6 +1252,8 @@ class HexagonalBoard {
                   pushedTeam
                 );
 
+                positionsChanged = true; // Positions changed
+
                 // Now move cogneur to target position
                 this.buttons[fromPosition].innerHTML = "";
                 this.buttons[fromPosition].classList.remove(
@@ -1241,6 +1267,11 @@ class HexagonalBoard {
                 this.tree[fromPosition].isConqueredByBlack = 0;
 
                 this.placeCharacterAtPosition(character, toPosition, team);
+
+                // Update positions if displacement occurred
+                if (positionsChanged) {
+                  this.updateCharacterPositionsAfterDisplacement();
+                }
 
                 return true;
               }
@@ -1305,7 +1336,6 @@ class HexagonalBoard {
               }
 
               if (targetCharPos !== null) {
-
                 // PROTECTOR CHECK (block grab)
                 if (this.isProtectedByProtector(targetCharPos, team)) {
                   return false;
@@ -1333,6 +1363,13 @@ class HexagonalBoard {
                   toPosition,
                   targetCharTeam
                 );
+
+                positionsChanged = true; // Positions changed
+
+                // Update positions if displacement occurred
+                if (positionsChanged) {
+                  this.updateCharacterPositionsAfterDisplacement();
+                }
 
                 // Claw launcher stays in place
                 return true;
@@ -1397,6 +1434,13 @@ class HexagonalBoard {
                       enemyTeam
                     );
 
+                    positionsChanged = true; // Positions changed
+
+                    // Update positions if displacement occurred
+                    if (positionsChanged) {
+                      this.updateCharacterPositionsAfterDisplacement();
+                    }
+
                     // Manipulator stays in place
                     return true;
                   }
@@ -1441,6 +1485,13 @@ class HexagonalBoard {
 
                 // Place ally at new position
                 this.placeCharacterAtPosition(allyCharacter, toPosition, team);
+
+                positionsChanged = true; // Positions changed
+
+                // Update positions if displacement occurred
+                if (positionsChanged) {
+                  this.updateCharacterPositionsAfterDisplacement();
+                }
 
                 // Brewmaster stays in place
                 return true;
@@ -1552,7 +1603,7 @@ class HexagonalBoard {
           : "none";
     }
 
-    // Show CLAW LAUNCHER toggle only if current character is CLAW LAUNCHER
+    // Show CLAW LAUNCHER toggle ONLY if current character is CLAW LAUNCHER (id: 7) AND it's the current character's turn AND not during NEMESIS intercept
     if (clawToggle) {
       if (
         this.currentPhase === "move" &&
@@ -1566,6 +1617,130 @@ class HexagonalBoard {
         clawToggle.style.display = "none";
       }
     }
+  }
+
+  // FIXED: Check win/lose conditions immediately after each character moves
+  checkWinLoseConditions() {
+    // Check both leaders
+    const whiteLeaderPos = this.getLeaderPosition("white");
+    const blackLeaderPos = this.getLeaderPosition("black");
+
+    if (whiteLeaderPos === null || blackLeaderPos === null) {
+      return; // Leaders not found
+    }
+
+    // Check each leader
+    this.checkLeaderLoseConditions(whiteLeaderPos, "white");
+    this.checkLeaderLoseConditions(blackLeaderPos, "black");
+  }
+
+  checkLeaderLoseConditions(leaderPos, team) {
+    const enemyTeam = team === "white" ? "black" : "white";
+
+    // a. Check if adjacent to ASSASSIN (id: 12)
+    const adjacent = this.adjacencyMap[leaderPos];
+    for (const pos of adjacent) {
+      const node = this.tree[pos];
+      if (node.pasukanID === 12) {
+        const assassinTeam = node.isConqueredByWhite === 1 ? "white" : "black";
+        if (assassinTeam === enemyTeam) {
+          alert(
+            `${enemyTeam.toUpperCase()} WINS!\n${team.toUpperCase()} Leader is adjacent to enemy ASSASSIN!`
+          );
+          location.reload();
+          return;
+        }
+      }
+    }
+
+    // b. Check if 2 opponent characters adjacent (FIXED: Archer cannot capture if adjacent)
+    let adjacentEnemies = 0;
+    let adjacentNonArcherEnemies = 0;
+
+    for (const pos of adjacent) {
+      const node = this.tree[pos];
+      if (node.pasukanID !== null) {
+        const nodeTeam = node.isConqueredByWhite === 1 ? "white" : "black";
+        if (nodeTeam === enemyTeam) {
+          adjacentEnemies++;
+          // Only count if it's NOT an archer
+          if (node.pasukanID !== 11) {
+            adjacentNonArcherEnemies++;
+          }
+        }
+      }
+    }
+
+    // If 2 non-archer enemies are adjacent, it's a capture
+    if (adjacentNonArcherEnemies >= 2) {
+      alert(
+        `${enemyTeam.toUpperCase()} WINS!\n${team.toUpperCase()} Leader is captured by 2 adjacent enemies!`
+      );
+      location.reload();
+      return;
+    }
+
+    // c. Check for ARCHER support (only with 1+ non-archer enemy adjacent AND archer 2 tiles away)
+    if (
+      adjacentNonArcherEnemies >= 1 &&
+      this.checkArcherSupport(leaderPos, enemyTeam)
+    ) {
+      alert(
+        `${enemyTeam.toUpperCase()} WINS!\n${team.toUpperCase()} Leader is captured with ARCHER support!`
+      );
+      location.reload();
+      return;
+    }
+
+    // d. Check if leader can't move (all adjacent filled)
+    let canMove = false;
+    for (const pos of adjacent) {
+      if (this.tree[pos].pasukanID === null) {
+        canMove = true;
+        break;
+      }
+    }
+
+    if (!canMove) {
+      alert(
+        `${enemyTeam.toUpperCase()} WINS!\n${team.toUpperCase()} Leader cannot move!`
+      );
+      location.reload();
+      return;
+    }
+  }
+
+  // Helper function to check for ARCHER support
+  checkArcherSupport(leaderPos, enemyTeam) {
+    const linesToCheck = [
+      ...HexagonalBoard.lines.vertical,
+      ...HexagonalBoard.lines.diagonalTopRight,
+      ...HexagonalBoard.lines.diagonalTopLeft,
+    ];
+
+    for (const line of linesToCheck) {
+      const index = line.indexOf(leaderPos);
+      if (index === -1) continue;
+
+      // Check 2 positions away in both directions
+      for (const direction of [-1, 1]) {
+        const targetIndex = index + direction * 2;
+        if (targetIndex >= 0 && targetIndex < line.length) {
+          const targetPos = line[targetIndex];
+          const node = this.tree[targetPos];
+
+          if (node.pasukanID === 11) {
+            // ARCHER id
+            const archerTeam =
+              node.isConqueredByWhite === 1 ? "white" : "black";
+            if (archerTeam === enemyTeam) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
   }
 
   moveToNextCharacter() {
@@ -1588,6 +1763,10 @@ class HexagonalBoard {
         nemesisPos !== null &&
         this.nemesisTeam === enemyTeam
       ) {
+        // FIXED: Store current state before NEMESIS intercept
+        this.characterIndexBeforeNemesis = this.currentCharacterIndex;
+        this.charactersToMoveBeforeNemesis = [...this.teamCharactersToMove];
+
         // Trigger NEMESIS intercept
         this.isNemesisIntercept = true;
         this.nemesisMovesRemaining = 2;
@@ -1640,8 +1819,7 @@ class HexagonalBoard {
     this.useClawGrab = false;
     this.isNemesisIntercept = false;
     this.nemesisMovesRemaining = 0;
-    this.vizierBonusUsed = false; 
-
+    this.vizierBonusUsed = false;
 
     // Reset ability toggle buttons
     const useSpecialBtn = document.getElementById("use-special-btn");
@@ -1680,11 +1858,86 @@ class HexagonalBoard {
     this.selectedCharacterPosition = null;
     this.clearHighlights();
     this.updatePhaseDisplay();
+
+    // AI auto recruitment if it's black team and AI mode
+    if (this.gameMode === "ai" && this.currentTurn === "black") {
+      this.aiAutoRecruit();
+    }
+  }
+
+  // NEW: AI auto recruitment for black team
+  aiAutoRecruit() {
+    // Wait a moment for visual clarity
+    setTimeout(() => {
+      const currentCards = this.currentCards;
+
+      // Find the character with highest poin
+      let highestPoin = -1;
+      const charactersWithHighestPoin = [];
+
+      for (let i = 0; i < currentCards.length; i++) {
+        const poin = currentCards[i]?.poin || 0;
+        if (poin > highestPoin) {
+          highestPoin = poin;
+          charactersWithHighestPoin.length = 0;
+          charactersWithHighestPoin.push(i);
+        } else if (poin === highestPoin && poin >= 0) {
+          charactersWithHighestPoin.push(i);
+        }
+      }
+
+      // Randomly pick one if there's a tie
+      const selectedCharIndex =
+        charactersWithHighestPoin[
+          Math.floor(Math.random() * charactersWithHighestPoin.length)
+        ];
+
+      // Get valid positions for black team
+      const validPositions = this.blackStartPositions.filter(
+        (pos) => this.tree[pos].pasukanID === null
+      );
+
+      if (validPositions.length === 0) {
+        // No valid position, end turn
+        this.endTurn();
+        return;
+      }
+
+      // Randomly select a valid position
+      const randomPosition =
+        validPositions[Math.floor(Math.random() * validPositions.length)];
+
+      // Perform the recruitment
+      this.selectedCardIndex = selectedCharIndex;
+      const character = this.currentCards[selectedCharIndex];
+      if (character) {
+        this.placeCharacterAtPosition(character, randomPosition, "black");
+
+        if (character.id === 16) {
+          this.placeHermitCub("black");
+        }
+
+        this.blackRecruitmentTurns++;
+
+        const newCharacter = this.getRandomCharacter();
+        if (newCharacter) {
+          this.currentCards[selectedCharIndex] = newCharacter;
+          this.updateCardDisplay(selectedCharIndex, newCharacter);
+        }
+
+        const cardElements = document.querySelectorAll(".playing-card");
+        cardElements.forEach((card) => card.classList.remove("selected"));
+        this.selectedCardIndex = null;
+      }
+
+      // End turn
+      this.endTurn();
+    }, 500);
   }
 
   checkPostLeaderMoveEffects(leaderPos) {
-    // ARCHER SUPPORT
-    this.checkArcherSupportCapture(leaderPos);
+    // ARCHER SUPPORT (removed - now checked in checkWinLoseConditions)
+    // Keeping this method in case other effects need to be added
   }
 
   handleButtonClick(event) {
@@ -1750,17 +2003,24 @@ class HexagonalBoard {
           this.checkPostLeaderMoveEffects(index);
         }
 
+        // CHECK WIN/LOSE CONDITIONS IMMEDIATELY AFTER THIS MOVE
+        this.checkWinLoseConditions();
+
         // ===== VIZIER CHECK (AFTER LEADER MOVE) =====
         const isLeader = movingCharId === 19 || movingCharId === 1;
 
-        if (isLeader && this.hasVizier(this.currentTurn) && !this.vizierBonusUsed) {
+        if (
+          isLeader &&
+          this.hasVizier(this.currentTurn) &&
+          !this.vizierBonusUsed
+        ) {
           this.teamCharactersToMove.splice(
             this.currentCharacterIndex + 1,
             0,
             index
           );
 
-          this.vizierBonusUsed = true; 
+          this.vizierBonusUsed = true;
         }
 
         // 🔁 Board changed → force ability re-evaluation
@@ -1770,7 +2030,25 @@ class HexagonalBoard {
           this.nemesisMovesRemaining--;
           if (this.nemesisMovesRemaining === 0) {
             this.isNemesisIntercept = false;
-            this.startRecruitmentPhase();
+
+            // FIXED: Restore pre-NEMESIS state and continue from where we left off
+            // Do NOT go to recruitment, continue with remaining characters
+            this.teamCharactersToMove = this.charactersToMoveBeforeNemesis;
+            this.currentCharacterIndex = this.characterIndexBeforeNemesis;
+
+            // CHECK WIN/LOSE CONDITIONS AFTER NEMESIS INTERCEPT
+            this.checkWinLoseConditions();
+
+            // Check if all characters have moved after NEMESIS intercept
+            if (
+              this.currentCharacterIndex >= this.teamCharactersToMove.length
+            ) {
+              this.startRecruitmentPhase();
+            } else {
+              // Continue with remaining characters
+              this.highlightCurrentCharacter();
+              this.updatePhaseDisplay();
+            }
           } else {
             this.currentCharacterIndex++;
             // GET UPDATED NEMESIS POSITION FOR NEXT MOVE
@@ -1782,28 +2060,7 @@ class HexagonalBoard {
             this.updatePhaseDisplay();
           }
         } else {
-          // CHECK FOR NEMESIS INTERCEPT IMMEDIATELY AFTER THIS MOVE
-          const isLeader = movingCharId === 19 || movingCharId === 1;
-          const enemyTeam = this.currentTurn === "white" ? "black" : "white";
-          const nemesisPos = this.getNemesisPosition(enemyTeam);
-
-          if (
-            isLeader &&
-            nemesisPos !== null &&
-            this.nemesisTeam === enemyTeam
-          ) {
-            // TRIGGER NEMESIS INTERCEPT NOW
-            this.isNemesisIntercept = true;
-            this.nemesisMovesRemaining = 2;
-            this.teamCharactersToMove = [nemesisPos, nemesisPos];
-            this.currentCharacterIndex = 0;
-            this.highlightCurrentCharacter();
-            this.updatePhaseDisplay();
-            return;
-          }
-
           this.moveToNextCharacter();
-
         }
       } else {
         this.selectedCharacterPosition = null;
@@ -1941,6 +2198,8 @@ class HexagonalBoard {
     this.isNemesisIntercept = false;
     this.nemesisMovesRemaining = 0;
     this.nemesisTeam = null;
+    this.characterIndexBeforeNemesis = 0;
+    this.charactersToMoveBeforeNemesis = [];
 
     // Reset ability toggle buttons
     const useSpecialBtn = document.getElementById("use-special-btn");
@@ -1996,84 +2255,17 @@ class HexagonalBoard {
       const isLeader = node.pasukanID === 19 || node.pasukanID === 1;
       if (!isLeader) continue;
 
-      const targetTeam =
-        node.isConqueredByWhite === 1 ? "white" : "black";
+      const targetTeam = node.isConqueredByWhite === 1 ? "white" : "black";
 
       if (targetTeam !== assassinTeam) {
         alert(
-          `${assassinTeam.toUpperCase()} MENANG!\nASSASSIN membunuh LEADER musuh`
+          `${assassinTeam.toUpperCase()} WINS!\nASSASSIN killed enemy LEADER`
         );
         location.reload();
         return;
       }
     }
   }
-
-  // ===== ARCHER SUPPORT ABILITY =====
-  checkArcherSupportCapture(movedLeaderPos) {
-    console.log("Test");
-    const movedLeaderNode = this.tree[movedLeaderPos];
-    if (!movedLeaderNode) return;
-
-    const isLeader =
-      movedLeaderNode.pasukanID === 1 || movedLeaderNode.pasukanID === 19;
-    if (!isLeader) return;
-
-    const leaderTeam =
-      movedLeaderNode.isConqueredByWhite === 1 ? "white" : "black";
-    const enemyTeam = leaderTeam === "white" ? "black" : "white";
-
-    // 1️⃣ Cari Leader lawan yang ADJACENT
-    const adjacent = this.adjacencyMap[movedLeaderPos];
-    let enemyLeaderPos = null;
-
-    for (const pos of adjacent) {
-      const node = this.tree[pos];
-      if (
-        node &&
-        (node.pasukanID === 1 || node.pasukanID === 19)
-      ) {
-        const nodeTeam =
-          node.isConqueredByWhite === 1 ? "white" : "black";
-        if (nodeTeam === enemyTeam) {
-          enemyLeaderPos = pos;
-          break;
-        }
-      }
-    }
-
-    if (enemyLeaderPos === null) return;
-
-    // 2️⃣ Cari ARCHER jarak 2 dari LEADER LAWAN
-    const distance1 = this.adjacencyMap[enemyLeaderPos];
-    const distance2 = new Set();
-
-    for (const pos1 of distance1) {
-      for (const pos2 of this.adjacencyMap[pos1]) {
-        if (pos2 !== enemyLeaderPos) {
-          distance2.add(pos2);
-        }
-      }
-    }
-
-    for (const pos of distance2) {
-      const node = this.tree[pos];
-      if (!node || node.pasukanID !== 11) continue;
-
-      const archerTeam =
-        node.isConqueredByWhite === 1 ? "white" : "black";
-
-      if (archerTeam === leaderTeam) {
-        alert(
-          `${leaderTeam.toUpperCase()} MENANG!\nLeader didukung ARCHER`
-        );
-        location.reload();
-        return;
-      }
-    }
-  }
-
-
 
   traverseTree(startIndex, callback) {
     const visited = new Set();
