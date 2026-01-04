@@ -2164,100 +2164,351 @@ class HexagonalBoard {
     this.startMovementPhase();
 
     if (
-      // 🤖 EASY AI TURN
+      // 🤖 AI TURN
       this.isAIPlayer &&
       this.currentTurn === "black" &&
-      this.aiDifficulty === "easy"
+      this.aiDifficulty
     ) {
       setTimeout(() => {
-        this.runEasyAI();
+        this.runAI();
       }, 400);
     }
   }
 
-  runEasyAI() {
-    // === untuk ai mode easy
+  // ========== UPDATED: AI DECISION LOGIC WITH ALPHA-BETA PRUNING ==========
+  // Depth based on difficulty: easy = 3, normal = 5, hard = 7
+  getAISearchDepth() {
+    switch (this.aiDifficulty) {
+      case "easy":
+        return 3;
+      case "normal":
+        return 5;
+      case "hard":
+        return 7;
+      default:
+        return 3;
+    }
+  }
+
+  runAI() {
     console.log("AI TURN STARTED", this.currentTurn, this.currentPhase);
     if (this.aiThinking) return;
     if (this.currentPhase !== "move") return;
     if (this.currentTurn !== "black") return;
 
-    // Jangan ganggu Nemesis
+    // Don't interfere with NEMESIS intercept
     if (this.isNemesisIntercept) return;
 
     this.aiThinking = true;
 
-    // Jika tidak ada karakter lagi → tunggu recruit / end turn
+    // If no characters left to move, wait for recruitment/end turn
     if (this.currentCharacterIndex >= this.teamCharactersToMove.length) {
       this.aiThinking = false;
       return;
     }
 
-    const bestMove = this.findBestMoveEasy();
+    // Find the best move using alpha-beta pruning
+    const bestMove = this.findBestMoveAI();
 
     if (!bestMove) {
-      // fallback: skip karakter ini
+      // No valid move found, skip to next character
       this.moveToNextCharacter();
       this.aiThinking = false;
-      setTimeout(() => this.runEasyAI(), 200);
+      setTimeout(() => this.runAI(), 200);
       return;
     }
 
     const { from, to } = bestMove;
 
-    // Eksekusi langsung (tanpa klik)
+    // Execute the move directly (without clicking)
     this.selectedCharacterPosition = from;
     this.moveCharacter(from, to);
     this.selectedCharacterPosition = null;
 
-    // Check win condition
+    // Check win/lose conditions
     this.checkWinLoseConditions();
 
-    // Lanjut ke karakter berikutnya
+    // Move to next character
     this.moveToNextCharacter();
 
     this.aiThinking = false;
 
-    // Jika masih fase MOVE dan masih giliran AI → lanjut
+    // If still in move phase and still AI's turn, continue
     if (this.currentTurn === "black" && this.currentPhase === "move") {
-      setTimeout(() => this.runEasyAI(), 300);
+      setTimeout(() => this.runAI(), 300);
     }
   }
 
-  findBestMoveEasy() {
-    // ==== decision tree ai ====
+  // ========== FIND BEST MOVE WITH PRIORITY SYSTEM ==========
+  findBestMoveAI() {
     const team = "black";
     const charPos = this.teamCharactersToMove[this.currentCharacterIndex];
     if (charPos == null) return null;
 
+    const node = this.tree[charPos];
+    const isLeader = node.pasukanID === 1; // Black leader is id 1
+
+    // Get all possible moves
     const moves = this.getMovePositions(charPos);
-    let bestScore = -Infinity;
-    let bestMove = null;
+    if (moves.length === 0) return null;
 
-    for (const to of moves) {
-      const snapshot = this.snapshotBoard();
+    // PRIORITY A: Only one move available
+    if (moves.length === 1) {
+      return { from: charPos, to: moves[0] };
+    }
 
-      this.moveCharacter(charPos, to);
-      const score = this.minimaxEasy(2, false, -Infinity, Infinity);
-      this.restoreBoard(snapshot);
+    if (isLeader) {
+      return this.findBestLeaderMove(charPos, moves, team);
+    } else {
+      return this.findBestNonLeaderMove(charPos, moves, team);
+    }
+  }
 
-      if (score > bestScore) {
-        bestScore = score;
-        bestMove = { from: charPos, to };
+  // ========== FIND BEST NON-LEADER MOVE ==========
+  findBestNonLeaderMove(charPos, moves, team) {
+    // Priority B: Movement would win the game
+    for (const move of moves) {
+      const snap = this.snapshotBoard();
+      this.moveCharacter(charPos, move);
+
+      // Check if white leader is defeated
+      const whiteLeaderPos = this.getLeaderPosition("white");
+      let isWin = false;
+
+      if (whiteLeaderPos !== null) {
+        // Check if leader is captured or can't move
+        const adjacent = this.adjacencyMap[whiteLeaderPos];
+        let nonArcherCount = 0;
+
+        for (const pos of adjacent) {
+          const n = this.tree[pos];
+          if (
+            n.pasukanID !== null &&
+            n.isConqueredByBlack === 1 &&
+            n.pasukanID !== 11
+          ) {
+            nonArcherCount++;
+          }
+        }
+
+        if (nonArcherCount >= 2) {
+          isWin = true;
+        } else if (
+          nonArcherCount >= 1 &&
+          this.checkArcherSupport(whiteLeaderPos, "black")
+        ) {
+          isWin = true;
+        }
+
+        // Check if leader can't move
+        let canMove = false;
+        for (const pos of adjacent) {
+          if (this.tree[pos].pasukanID === null) {
+            canMove = true;
+            break;
+          }
+        }
+        if (!canMove) {
+          isWin = true;
+        }
+      }
+
+      this.restoreBoard(snap);
+
+      if (isWin) {
+        return { from: charPos, to: move };
       }
     }
 
-    return bestMove;
+    // Priority C: Protect team from losing (only if 1 adjacent enemy or 1 archer capturing leader)
+    const blackLeaderPos = this.getLeaderPosition("black");
+    if (blackLeaderPos !== null) {
+      const leaderAdj = this.adjacencyMap[blackLeaderPos];
+      let adjacentWhiteCount = 0;
+      let archerCount = 0;
+
+      for (const pos of leaderAdj) {
+        const n = this.tree[pos];
+        if (n.pasukanID !== null && n.isConqueredByWhite === 1) {
+          adjacentWhiteCount++;
+          if (n.pasukanID === 11) archerCount++;
+        }
+      }
+
+      // Only check if 1 enemy or 1 archer
+      if (
+        adjacentWhiteCount <= 1 ||
+        (archerCount === 1 && adjacentWhiteCount === 1)
+      ) {
+        for (const move of moves) {
+          const snap = this.snapshotBoard();
+          this.moveCharacter(charPos, move);
+
+          // Check if move eliminates threat
+          const newLeaderAdj = this.adjacencyMap[blackLeaderPos];
+          let newWhiteCount = 0;
+
+          for (const pos of newLeaderAdj) {
+            const n = this.tree[pos];
+            if (n.pasukanID !== null && n.isConqueredByWhite === 1) {
+              newWhiteCount++;
+            }
+          }
+
+          this.restoreBoard(snap);
+
+          // If threat is eliminated and leader can still move
+          if (newWhiteCount < adjacentWhiteCount) {
+            let leaderCanMove = false;
+            for (const pos of newLeaderAdj) {
+              if (this.tree[pos].pasukanID === null) {
+                leaderCanMove = true;
+                break;
+              }
+            }
+            if (leaderCanMove) {
+              return { from: charPos, to: move };
+            }
+          }
+        }
+      }
+    }
+
+    // Priority D: Get closer to enemy leader (non-leader: adjacent or 2 tiles for archer)
+    const whiteLeaderPos = this.getLeaderPosition("white");
+    const charNode = this.tree[charPos];
+    const isArcher = charNode.pasukanID === 11;
+
+    let bestMove = null;
+    let bestDistance = Infinity;
+
+    for (const move of moves) {
+      const dist = this.hexDistance(move, whiteLeaderPos);
+
+      // For archer: prefer 2 tiles away (negative score bonus)
+      // For others: prefer adjacent
+      if (isArcher) {
+        if (dist === 2 && dist < bestDistance) {
+          bestDistance = dist;
+          bestMove = move;
+        } else if (dist === 2) {
+          // Stay at distance 2 if possible
+          bestMove = move;
+        }
+      } else {
+        if (dist <= 1) {
+          return { from: charPos, to: move };
+        }
+        if (dist < bestDistance) {
+          bestDistance = dist;
+          bestMove = move;
+        }
+      }
+    }
+
+    // Priority E: Use alpha-beta pruning if no move found yet
+    if (bestMove === null && moves.length > 0) {
+      const depth = this.getAISearchDepth();
+      let bestScore = -Infinity;
+
+      for (const move of moves) {
+        const snap = this.snapshotBoard();
+        this.moveCharacter(charPos, move);
+        const score = this.minimaxAI(depth - 1, false, -Infinity, Infinity);
+        this.restoreBoard(snap);
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = move;
+        }
+      }
+    }
+
+    return bestMove ? { from: charPos, to: bestMove } : null;
   }
 
-  minimaxEasy(depth, isMaximizing, alpha, beta) {
-    // ===== prunning ====
+  // ========== FIND BEST LEADER MOVE ==========
+  findBestLeaderMove(charPos, moves, team) {
+    const whiteLeaderPos = this.getLeaderPosition("white");
+
+    // Priority B: Ensure leader doesn't lose
+    for (const move of moves) {
+      const snap = this.snapshotBoard();
+      this.moveCharacter(charPos, move);
+
+      // Check if leader is safer
+      const adj = this.adjacencyMap[move];
+      let whiteEnemyCount = 0;
+
+      for (const pos of adj) {
+        const n = this.tree[pos];
+        if (n.pasukanID !== null && n.isConqueredByWhite === 1) {
+          whiteEnemyCount++;
+        }
+      }
+
+      // Check if leader can still move
+      let canMove = false;
+      for (const pos of adj) {
+        if (this.tree[pos].pasukanID === null) {
+          canMove = true;
+          break;
+        }
+      }
+
+      this.restoreBoard(snap);
+
+      // Prefer moves that minimize enemies and allow movement
+      if (whiteEnemyCount === 0 && canMove) {
+        return { from: charPos, to: move };
+      }
+    }
+
+    // Priority C: Move farther from white leaders
+    let bestMove = null;
+    let bestDistance = -Infinity;
+
+    for (const move of moves) {
+      const dist = this.hexDistance(move, whiteLeaderPos);
+      if (dist > bestDistance) {
+        bestDistance = dist;
+        bestMove = move;
+      }
+    }
+
+    if (bestMove !== null) {
+      return { from: charPos, to: bestMove };
+    }
+
+    // Fallback: use alpha-beta pruning
+    const depth = this.getAISearchDepth();
+    let bestScore = -Infinity;
+
+    for (const move of moves) {
+      const snap = this.snapshotBoard();
+      this.moveCharacter(charPos, move);
+      const score = this.minimaxAI(depth - 1, false, -Infinity, Infinity);
+      this.restoreBoard(snap);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = move;
+      }
+    }
+
+    return bestMove ? { from: charPos, to: bestMove } : null;
+  }
+
+  // ========== MINIMAX WITH ALPHA-BETA PRUNING ==========
+  minimaxAI(depth, isMaximizing, alpha, beta) {
     if (depth === 0) {
-      return this.evaluateEasy();
+      return this.evaluateAI();
     }
 
     const team = isMaximizing ? "black" : "white";
-    const positions = this.getTeamCharacterPositions(team);
+    const positions = this.getTeamCharacterPositions(team).filter(
+      (pos) => this.tree[pos].pasukanID !== 18 // Exclude NEMESIS
+    );
 
     if (isMaximizing) {
       let maxEval = -Infinity;
@@ -2266,15 +2517,15 @@ class HexagonalBoard {
         for (const to of moves) {
           const snap = this.snapshotBoard();
           this.moveCharacter(pos, to);
-          const evalScore = this.minimaxEasy(depth - 1, false, alpha, beta);
+          const evalScore = this.minimaxAI(depth - 1, false, alpha, beta);
           this.restoreBoard(snap);
 
           maxEval = Math.max(maxEval, evalScore);
           alpha = Math.max(alpha, evalScore);
-          if (beta <= alpha) return maxEval;
+          if (beta <= alpha) return maxEval; // Beta cutoff
         }
       }
-      return maxEval;
+      return maxEval === -Infinity ? 0 : maxEval;
     } else {
       let minEval = Infinity;
       for (const pos of positions) {
@@ -2282,52 +2533,86 @@ class HexagonalBoard {
         for (const to of moves) {
           const snap = this.snapshotBoard();
           this.moveCharacter(pos, to);
-          const evalScore = this.minimaxEasy(depth - 1, true, alpha, beta);
+          const evalScore = this.minimaxAI(depth - 1, true, alpha, beta);
           this.restoreBoard(snap);
 
           minEval = Math.min(minEval, evalScore);
           beta = Math.min(beta, evalScore);
-          if (beta <= alpha) return minEval;
+          if (beta <= alpha) return minEval; // Alpha cutoff
         }
       }
-      return minEval;
+      return minEval === Infinity ? 0 : minEval;
     }
   }
 
-  evaluateEasy() {
-    // ========= sbe =========
-    const enemyLeader = this.getLeaderPosition("white");
-    const myLeader = this.getLeaderPosition("black");
+  // ========== EVALUATION FUNCTION ==========
+  evaluateAI() {
+    const blackLeaderPos = this.getLeaderPosition("black");
+    const whiteLeaderPos = this.getLeaderPosition("white");
 
-    if (enemyLeader === null) return 100000;
-    if (myLeader === null) return -100000;
+    if (whiteLeaderPos === null) return 100000; // Black wins
+    if (blackLeaderPos === null) return -100000; // White wins
 
     let score = 0;
 
-    // Tekanan ke Leader White
-    const adj = this.adjacencyMap[enemyLeader];
-    let nonArcherEnemies = 0;
+    // ===== OFFENSIVE SCORING =====
+    // Pressure white leader with non-archer units
+    const whiteAdj = this.adjacencyMap[whiteLeaderPos];
+    let blackNonArcherAdj = 0;
 
-    for (const pos of adj) {
-      const node = this.tree[pos];
-      if (node && node.isConqueredByBlack === 1 && node.pasukanID !== 11) {
-        nonArcherEnemies++;
+    for (const pos of whiteAdj) {
+      const n = this.tree[pos];
+      if (n && n.isConqueredByBlack === 1 && n.pasukanID !== 11) {
+        blackNonArcherAdj++;
       }
     }
 
-    if (nonArcherEnemies >= 2) score += 5000;
-
+    if (blackNonArcherAdj >= 2) score += 5000; // Capture threat
     if (
-      nonArcherEnemies >= 1 &&
-      this.checkArcherSupport(enemyLeader, "black")
+      blackNonArcherAdj >= 1 &&
+      this.checkArcherSupport(whiteLeaderPos, "black")
     ) {
-      score += 3000;
+      score += 3000; // Archer support
     }
 
-    // Dekati Leader White
-    for (const pos of this.getTeamCharacterPositions("black")) {
-      score -= this.hexDistance(pos, enemyLeader) * 5;
+    // Distance to white leader (prefer closer)
+    const blackPositions = this.getTeamCharacterPositions("black");
+    let totalDistance = 0;
+    for (const pos of blackPositions) {
+      totalDistance += this.hexDistance(pos, whiteLeaderPos);
     }
+    score -= Math.ceil(totalDistance / Math.max(1, blackPositions.length)) * 2;
+
+    // ===== DEFENSIVE SCORING =====
+    // Keep black leader safe
+    const blackAdj = this.adjacencyMap[blackLeaderPos];
+    let whiteEnemyAdj = 0;
+
+    for (const pos of blackAdj) {
+      const n = this.tree[pos];
+      if (n && n.isConqueredByWhite === 1) {
+        whiteEnemyAdj++;
+      }
+    }
+
+    // Penalize if leader is threatened
+    if (whiteEnemyAdj >= 2) score -= 5000;
+    if (
+      whiteEnemyAdj >= 1 &&
+      this.checkArcherSupport(blackLeaderPos, "white")
+    ) {
+      score -= 3000;
+    }
+
+    // Ensure leader can move
+    let blackLeaderCanMove = false;
+    for (const pos of blackAdj) {
+      if (this.tree[pos].pasukanID === null) {
+        blackLeaderCanMove = true;
+        break;
+      }
+    }
+    if (!blackLeaderCanMove) score -= 10000; // Losing condition
 
     return score;
   }
@@ -2349,7 +2634,7 @@ class HexagonalBoard {
       node.isConqueredByWhite = snap.isConqueredByWhite;
       node.isConqueredByBlack = snap.isConqueredByBlack;
 
-      // Update DOM agar konsisten
+      // Update DOM to be consistent
       const btn = this.buttons[i];
       if (snap.pasukanID === null) {
         btn.innerHTML = "";
@@ -2364,7 +2649,6 @@ class HexagonalBoard {
   }
 
   hexDistance(a, b) {
-    // ===== distance ==============
     if (a === b) return 0;
     const visited = new Set();
     const queue = [{ pos: a, dist: 0 }];
