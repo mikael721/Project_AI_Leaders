@@ -6,6 +6,8 @@ class HexagonalBoard {
   constructor(gameMode, aiDifficulty = null) {
     this.gameMode = gameMode;
     this.aiDifficulty = aiDifficulty;
+    this.isAIPlayer = gameMode === "ai"; // === ini buat ai ====
+    this.aiThinking = false;
     this.board = document.getElementById("game-board");
     this.buttons = [];
     this.positions = this.calculatePositions();
@@ -2142,16 +2144,232 @@ class HexagonalBoard {
   }
 
   endTurn() {
-    const previousTurn = this.currentTurn;
     this.currentTurn = this.currentTurn === "white" ? "black" : "white";
-
     if (this.currentTurn === "white") {
       this.turnCount++;
     }
-
     this.updateTurnDisplay();
-
     this.startMovementPhase();
+
+    if ( // 🤖 EASY AI TURN
+      this.isAIPlayer &&
+      this.currentTurn === "black" &&
+      this.aiDifficulty === "easy"
+    ) {
+      setTimeout(() => {
+        this.runEasyAI();
+      }, 400);
+    }
+  }
+
+  runEasyAI() { // === untuk ai mode easy
+    console.log("AI TURN STARTED", this.currentTurn, this.currentPhase);
+    if (this.aiThinking) return;
+    if (this.currentPhase !== "move") return;
+    if (this.currentTurn !== "black") return;
+
+    // Jangan ganggu Nemesis
+    if (this.isNemesisIntercept) return;
+
+    this.aiThinking = true;
+
+    // Jika tidak ada karakter lagi → tunggu recruit / end turn
+    if (this.currentCharacterIndex >= this.teamCharactersToMove.length) {
+      this.aiThinking = false;
+      return;
+    }
+
+    const bestMove = this.findBestMoveEasy();
+
+    if (!bestMove) {
+      // fallback: skip karakter ini
+      this.moveToNextCharacter();
+      this.aiThinking = false;
+      setTimeout(() => this.runEasyAI(), 200);
+      return;
+    }
+
+    const { from, to } = bestMove;
+
+    // Eksekusi langsung (tanpa klik)
+    this.selectedCharacterPosition = from;
+    this.moveCharacter(from, to);
+    this.selectedCharacterPosition = null;
+
+    // Check win condition
+    this.checkWinLoseConditions();
+
+    // Lanjut ke karakter berikutnya
+    this.moveToNextCharacter();
+
+    this.aiThinking = false;
+
+    // Jika masih fase MOVE dan masih giliran AI → lanjut
+    if (
+      this.currentTurn === "black" &&
+      this.currentPhase === "move"
+    ) {
+      setTimeout(() => this.runEasyAI(), 300);
+    }
+  }
+
+  findBestMoveEasy() { // ==== decision tree ai ====
+    const team = "black";
+    const charPos = this.teamCharactersToMove[this.currentCharacterIndex];
+    if (charPos == null) return null;
+
+    const moves = this.getMovePositions(charPos);
+    let bestScore = -Infinity;
+    let bestMove = null;
+
+    for (const to of moves) {
+      const snapshot = this.snapshotBoard();
+
+      this.moveCharacter(charPos, to);
+      const score = this.minimaxEasy(2, false, -Infinity, Infinity);
+      this.restoreBoard(snapshot);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = { from: charPos, to };
+      }
+    }
+
+    return bestMove;
+  }
+
+  minimaxEasy(depth, isMaximizing, alpha, beta) { // ===== prunning ====
+    if (depth === 0) {
+      return this.evaluateEasy();
+    }
+
+    const team = isMaximizing ? "black" : "white";
+    const positions = this.getTeamCharacterPositions(team);
+
+    if (isMaximizing) {
+      let maxEval = -Infinity;
+      for (const pos of positions) {
+        const moves = this.getMovePositions(pos);
+        for (const to of moves) {
+          const snap = this.snapshotBoard();
+          this.moveCharacter(pos, to);
+          const evalScore = this.minimaxEasy(depth - 1, false, alpha, beta);
+          this.restoreBoard(snap);
+
+          maxEval = Math.max(maxEval, evalScore);
+          alpha = Math.max(alpha, evalScore);
+          if (beta <= alpha) return maxEval;
+        }
+      }
+      return maxEval;
+    } else {
+      let minEval = Infinity;
+      for (const pos of positions) {
+        const moves = this.getMovePositions(pos);
+        for (const to of moves) {
+          const snap = this.snapshotBoard();
+          this.moveCharacter(pos, to);
+          const evalScore = this.minimaxEasy(depth - 1, true, alpha, beta);
+          this.restoreBoard(snap);
+
+          minEval = Math.min(minEval, evalScore);
+          beta = Math.min(beta, evalScore);
+          if (beta <= alpha) return minEval;
+        }
+      }
+      return minEval;
+    }
+  }
+
+  evaluateEasy() { // ========= sbe =========
+    const enemyLeader = this.getLeaderPosition("white");
+    const myLeader = this.getLeaderPosition("black");
+
+    if (enemyLeader === null) return 100000;
+    if (myLeader === null) return -100000;
+
+    let score = 0;
+
+    // Tekanan ke Leader White
+    const adj = this.adjacencyMap[enemyLeader];
+    let nonArcherEnemies = 0;
+
+    for (const pos of adj) {
+      const node = this.tree[pos];
+      if (
+        node &&
+        node.isConqueredByBlack === 1 &&
+        node.pasukanID !== 11
+      ) {
+        nonArcherEnemies++;
+      }
+    }
+
+    if (nonArcherEnemies >= 2) score += 5000;
+
+    if (
+      nonArcherEnemies >= 1 &&
+      this.checkArcherSupport(enemyLeader, "black")
+    ) {
+      score += 3000;
+    }
+
+    // Dekati Leader White
+    for (const pos of this.getTeamCharacterPositions("black")) {
+      score -= this.hexDistance(pos, enemyLeader) * 5;
+    }
+
+    return score;
+  }
+
+  snapshotBoard() {
+    return this.tree.map(node => ({
+      pasukanID: node.pasukanID,
+      isConqueredByWhite: node.isConqueredByWhite,
+      isConqueredByBlack: node.isConqueredByBlack
+    }));
+  }
+
+  restoreBoard(snapshot) {
+    for (let i = 0; i < this.tree.length; i++) {
+      const snap = snapshot[i];
+      const node = this.tree[i];
+
+      node.pasukanID = snap.pasukanID;
+      node.isConqueredByWhite = snap.isConqueredByWhite;
+      node.isConqueredByBlack = snap.isConqueredByBlack;
+
+      // Update DOM agar konsisten
+      const btn = this.buttons[i];
+      if (snap.pasukanID === null) {
+        btn.innerHTML = "";
+        btn.classList.remove("active");
+        btn.dataset.active = "false";
+      } else {
+        const char = characters.find(c => c.id === snap.pasukanID);
+        const team = snap.isConqueredByWhite ? "white" : "black";
+        this.placeCharacterAtPosition(char, i, team);
+      }
+    }
+  }
+
+  hexDistance(a, b) { // ===== distance ==============
+    if (a === b) return 0;
+    const visited = new Set();
+    const queue = [{ pos: a, dist: 0 }];
+
+    while (queue.length) {
+      const { pos, dist } = queue.shift();
+      if (pos === b) return dist;
+      visited.add(pos);
+
+      for (const n of this.adjacencyMap[pos]) {
+        if (!visited.has(n)) {
+          queue.push({ pos: n, dist: dist + 1 });
+        }
+      }
+    }
+    return 99;
   }
 
   updateTurnDisplay() {
