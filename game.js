@@ -1192,9 +1192,22 @@ class HexagonalBoard {
 
         positionsChanged = true; // Positions changed
 
-        // FIXED: Immediately update the Illusionist's position in teamCharactersToMove
+        // FIXED: Update both positions in the movement queue
+        // Update ILLUSIONIST's current position
         if (this.currentCharacterIndex < this.teamCharactersToMove.length) {
           this.teamCharactersToMove[this.currentCharacterIndex] = toPosition;
+        }
+
+        // Update swapped ally's position if it's in the queue and hasn't moved yet
+        for (
+          let i = this.currentCharacterIndex + 1;
+          i < this.teamCharactersToMove.length;
+          i++
+        ) {
+          if (this.teamCharactersToMove[i] === toPosition) {
+            this.teamCharactersToMove[i] = fromPosition;
+            break;
+          }
         }
 
         // ASSASSIN passive check after move
@@ -1202,10 +1215,9 @@ class HexagonalBoard {
           this.checkAssassinKill(toPosition);
         }
 
-        // Update positions if displacement occurred
-        if (positionsChanged) {
-          this.updateCharacterPositionsAfterDisplacement();
-        }
+        // DO NOT call updateCharacterPositionsAfterDisplacement for ILLUSIONIST
+        // because the swapped ally should keep its original turn order
+        // Only the positions need to be updated in the array (already done above)
 
         return true;
       }
@@ -2151,7 +2163,8 @@ class HexagonalBoard {
     this.updateTurnDisplay();
     this.startMovementPhase();
 
-    if ( // 🤖 EASY AI TURN
+    if (
+      // 🤖 EASY AI TURN
       this.isAIPlayer &&
       this.currentTurn === "black" &&
       this.aiDifficulty === "easy"
@@ -2162,7 +2175,8 @@ class HexagonalBoard {
     }
   }
 
-  runEasyAI() { // === untuk ai mode easy
+  runEasyAI() {
+    // === untuk ai mode easy
     console.log("AI TURN STARTED", this.currentTurn, this.currentPhase);
     if (this.aiThinking) return;
     if (this.currentPhase !== "move") return;
@@ -2205,15 +2219,13 @@ class HexagonalBoard {
     this.aiThinking = false;
 
     // Jika masih fase MOVE dan masih giliran AI → lanjut
-    if (
-      this.currentTurn === "black" &&
-      this.currentPhase === "move"
-    ) {
+    if (this.currentTurn === "black" && this.currentPhase === "move") {
       setTimeout(() => this.runEasyAI(), 300);
     }
   }
 
-  findBestMoveEasy() { // ==== decision tree ai ====
+  findBestMoveEasy() {
+    // ==== decision tree ai ====
     const team = "black";
     const charPos = this.teamCharactersToMove[this.currentCharacterIndex];
     if (charPos == null) return null;
@@ -2238,7 +2250,8 @@ class HexagonalBoard {
     return bestMove;
   }
 
-  minimaxEasy(depth, isMaximizing, alpha, beta) { // ===== prunning ====
+  minimaxEasy(depth, isMaximizing, alpha, beta) {
+    // ===== prunning ====
     if (depth === 0) {
       return this.evaluateEasy();
     }
@@ -2281,7 +2294,8 @@ class HexagonalBoard {
     }
   }
 
-  evaluateEasy() { // ========= sbe =========
+  evaluateEasy() {
+    // ========= sbe =========
     const enemyLeader = this.getLeaderPosition("white");
     const myLeader = this.getLeaderPosition("black");
 
@@ -2296,11 +2310,7 @@ class HexagonalBoard {
 
     for (const pos of adj) {
       const node = this.tree[pos];
-      if (
-        node &&
-        node.isConqueredByBlack === 1 &&
-        node.pasukanID !== 11
-      ) {
+      if (node && node.isConqueredByBlack === 1 && node.pasukanID !== 11) {
         nonArcherEnemies++;
       }
     }
@@ -2323,10 +2333,10 @@ class HexagonalBoard {
   }
 
   snapshotBoard() {
-    return this.tree.map(node => ({
+    return this.tree.map((node) => ({
       pasukanID: node.pasukanID,
       isConqueredByWhite: node.isConqueredByWhite,
-      isConqueredByBlack: node.isConqueredByBlack
+      isConqueredByBlack: node.isConqueredByBlack,
     }));
   }
 
@@ -2346,14 +2356,15 @@ class HexagonalBoard {
         btn.classList.remove("active");
         btn.dataset.active = "false";
       } else {
-        const char = characters.find(c => c.id === snap.pasukanID);
+        const char = characters.find((c) => c.id === snap.pasukanID);
         const team = snap.isConqueredByWhite ? "white" : "black";
         this.placeCharacterAtPosition(char, i, team);
       }
     }
   }
 
-  hexDistance(a, b) { // ===== distance ==============
+  hexDistance(a, b) {
+    // ===== distance ==============
     if (a === b) return 0;
     const visited = new Set();
     const queue = [{ pos: a, dist: 0 }];
