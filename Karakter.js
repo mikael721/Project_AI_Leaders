@@ -272,7 +272,7 @@ export const characters = [
     fullart: "Full Art/LEADERS-Nemesis_LQ.PNG",
     white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Nemesis.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Nemesis.png",
-    poin: 7,
+    poin: 0,
     isKing: false,
 
     tim: "white",
