@@ -5,6 +5,7 @@ import { characters } from "./Karakter.js";
 class HexagonalBoard {
   constructor(gameMode, aiDifficulty = null) {
     this.gameMode = gameMode;
+    this.resumeAIAfterNemesis = false;
     this.aiDifficulty = aiDifficulty;
     this.isAIPlayer = gameMode === "ai"; // === ini buat ai ====
     this.aiThinking = false;
@@ -589,6 +590,7 @@ class HexagonalBoard {
     return false;
   }
 
+  // ================== untuk nemesis =================
   getNemesisPosition(team) {
     for (let i = 0; i < this.tree.length; i++) {
       if (this.tree[i].pasukanID === 18) {
@@ -600,6 +602,97 @@ class HexagonalBoard {
       }
     }
     return null;
+  }
+
+  triggerNemesisAfterLeaderMove(movingCharId) {
+    const isLeader = movingCharId === 19 || movingCharId === 1;
+    if (!isLeader) return false;
+
+    const enemyTeam = this.currentTurn === "white" ? "black" : "white";
+    const nemesisPos = this.getNemesisPosition(enemyTeam);
+
+    if (nemesisPos === null) return false;
+    if (this.nemesisTeam !== enemyTeam) return false;
+    if (this.isNemesisIntercept) return false;
+
+    // Simpan state sebelum intercept
+    this.characterIndexBeforeNemesis = this.currentCharacterIndex + 1;
+    this.charactersToMoveBeforeNemesis = [...this.teamCharactersToMove];
+
+    // Aktifkan intercept
+    this.isNemesisIntercept = true;
+    this.nemesisMovesRemaining = 2;
+    this.teamCharactersToMove = [nemesisPos, nemesisPos];
+    this.currentCharacterIndex = 0;
+
+    this.highlightCurrentCharacter();
+    this.updatePhaseDisplay();
+
+    return true; // 🔥 PENTING
+  }
+
+  runNemesisAI() {
+    if (!this.isNemesisIntercept) return;
+    if (this.currentTurn !== "white") return; // karena NEMESIS AI = milik black
+    if (!this.isAIPlayer) return;
+
+    console.log("🤖 AI controlling NEMESIS");
+
+    const nemesisPos = this.teamCharactersToMove[this.currentCharacterIndex];
+    if (nemesisPos == null) return;
+
+    const moves = this.getMovePositions(nemesisPos);
+    if (moves.length === 0) {
+      // Skip kalau tidak bisa bergerak
+      this.handleNemesisMoveDone();
+      return;
+    }
+
+    // Pilih random / simple (NEMESIS tidak perlu minimax)
+    const target = moves[Math.floor(Math.random() * moves.length)];
+
+    this.moveCharacter(nemesisPos, target);
+    this.checkWinLoseConditions();
+
+    this.handleNemesisMoveDone();
+  }
+
+  handleNemesisMoveDone() {
+    this.nemesisMovesRemaining--;
+
+    if (this.nemesisMovesRemaining === 0) {
+      // Selesai intercept
+      this.isNemesisIntercept = false;
+
+      this.teamCharactersToMove = this.charactersToMoveBeforeNemesis;
+      this.currentCharacterIndex = this.characterIndexBeforeNemesis;
+
+      this.checkWinLoseConditions();
+
+      if (this.currentCharacterIndex >= this.teamCharactersToMove.length) {
+        this.startRecruitmentPhase();
+      } else {
+        this.highlightCurrentCharacter();
+        this.updatePhaseDisplay();
+      }
+
+      // 🔥 LANJUTKAN AI NORMAL
+      if (
+        this.resumeAIAfterNemesis &&
+        this.gameMode === "ai" &&
+        this.currentTurn === "black"
+      ) {
+        this.resumeAIAfterNemesis = false;
+        setTimeout(() => this.runAI(), 300);
+      }
+    } else {
+      // Next nemesis move
+      this.currentCharacterIndex = 1;
+      this.teamCharactersToMove[1] =
+        this.getNemesisPosition("black");
+
+      setTimeout(() => this.runNemesisAI(), 300);
+    }
   }
 
   // =========== UNTUK VIZIER ===================
@@ -1772,25 +1865,6 @@ class HexagonalBoard {
       const enemyTeam = this.currentTurn === "white" ? "black" : "white";
       const nemesisPos = this.getNemesisPosition(enemyTeam);
 
-      if (
-        lastCharIsLeader &&
-        nemesisPos !== null &&
-        this.nemesisTeam === enemyTeam
-      ) {
-        // FIXED: Store current state before NEMESIS intercept
-        this.characterIndexBeforeNemesis = this.currentCharacterIndex;
-        this.charactersToMoveBeforeNemesis = [...this.teamCharactersToMove];
-
-        // Trigger NEMESIS intercept
-        this.isNemesisIntercept = true;
-        this.nemesisMovesRemaining = 2;
-        this.teamCharactersToMove = [nemesisPos, nemesisPos];
-        this.currentCharacterIndex = 0;
-        this.highlightCurrentCharacter();
-        this.updatePhaseDisplay();
-        return;
-      }
-
       // No NEMESIS intercept, proceed to recruitment
       this.startRecruitmentPhase();
     } else {
@@ -2020,6 +2094,11 @@ class HexagonalBoard {
         // CHECK WIN/LOSE CONDITIONS IMMEDIATELY AFTER THIS MOVE
         this.checkWinLoseConditions();
 
+        if (this.triggerNemesisAfterLeaderMove(movingCharId)) {
+          return; // ⛔ stop flow normal
+        }
+
+
         // ===== VIZIER CHECK (AFTER LEADER MOVE) =====
         const isLeader = movingCharId === 19 || movingCharId === 1;
 
@@ -2063,6 +2142,20 @@ class HexagonalBoard {
               this.highlightCurrentCharacter();
               this.updatePhaseDisplay();
             }
+
+            // ===== RESUME AI AFTER NEMESIS (FIX FINAL) =====
+            if (
+              this.resumeAIAfterNemesis &&
+              this.gameMode === "ai" &&
+              this.currentTurn === "black"
+            ) {
+              this.resumeAIAfterNemesis = false;
+
+              setTimeout(() => {
+                this.runAI();
+              }, 300);
+            }
+
           } else {
             this.currentCharacterIndex++;
             // GET UPDATED NEMESIS POSITION FOR NEXT MOVE
@@ -2073,9 +2166,12 @@ class HexagonalBoard {
             this.highlightCurrentCharacter();
             this.updatePhaseDisplay();
           }
+
         } else {
           this.moveToNextCharacter();
         }
+
+
       } else {
         this.selectedCharacterPosition = null;
         this.clearHighlights();
@@ -2222,11 +2318,26 @@ class HexagonalBoard {
 
     // Execute the move directly (without clicking)
     this.selectedCharacterPosition = from;
-    this.moveCharacter(from, to);
     this.selectedCharacterPosition = null;
+
+    this.moveCharacter(from, to);
 
     // Check win/lose conditions
     this.checkWinLoseConditions();
+
+    // ===== NEMESIS CHECK (AI MODE FIX) =====
+    const movedCharId = this.tree[to]?.pasukanID;
+    if (this.triggerNemesisAfterLeaderMove(movedCharId)) {
+      this.resumeAIAfterNemesis = true;
+      this.aiThinking = false;
+
+      // 🔥 JALANKAN NEMESIS AI
+      setTimeout(() => {
+        this.runNemesisAI();
+      }, 300);
+
+      return;
+    }
 
     // Move to next character
     this.moveToNextCharacter();
