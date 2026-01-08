@@ -179,7 +179,7 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: 11,
+    id: 1,
   },
   {
     nama: "ASSASSIN",
