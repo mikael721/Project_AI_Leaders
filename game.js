@@ -1170,6 +1170,37 @@ class HexagonalBoard {
     return specialMoves;
   }
 
+  // ========== LEADER SAFETY RULE ==========
+  // Returns true if character is a leader
+  isLeader(characterId) {
+    return characterId === 19 || characterId === 1; // White or Black leader
+  }
+
+  // ========== CHECK IF MOVE IS LEGAL FOR LEADER ==========
+  // Leader move is illegal if it causes loss condition
+  // Returns true if move is legal (leader stays safe)
+  isLeaderMoveLegal(characterPos, movePos) {
+    const node = this.tree[characterPos];
+    if (!this.isLeader(node.pasukanID)) {
+      return true; // Not a leader, always legal
+    }
+
+    const team = node.isConqueredByWhite === 1 ? "white" : "black";
+
+    // Simulate move
+    const snap = this.snapshotBoard();
+    this.moveCharacter(characterPos, movePos);
+
+    // Check if leader loses after move
+    const checkResult = this.winCek(team);
+    const isLegal = checkResult.status === "none"; // Legal if NOT losing
+
+    // Restore board
+    this.restoreBoard(snap);
+
+    return isLegal;
+  }
+
   // New method to get moves based on current ability toggle
   getMovePositions(characterPos) {
     const node = this.tree[characterPos];
@@ -1179,17 +1210,35 @@ class HexagonalBoard {
     // 🔒 JAILER CHECK
     const jailed = this.isJailed(characterPos, team);
 
+    let basicMoves = [];
     if (jailed) {
       // Force NORMAL MOVE ONLY
-      return this.getAvailableMovePositions(characterPos);
+      basicMoves = this.getAvailableMovePositions(characterPos);
+    } else if (this.useSpecialAbility) {
+      basicMoves = this.getSpecialMovePositions(characterPos);
+    } else {
+      basicMoves = this.getAvailableMovePositions(characterPos);
     }
 
-    // Normal logic
-    if (this.useSpecialAbility) {
-      return this.getSpecialMovePositions(characterPos);
-    } else {
-      return this.getAvailableMovePositions(characterPos);
+    // ========== LEADER SAFETY FILTER ==========
+    // If this is a leader, filter out moves that would cause loss
+    if (this.isLeader(node.pasukanID)) {
+      const legalMoves = basicMoves.filter((movePos) =>
+        this.isLeaderMoveLegal(characterPos, movePos)
+      );
+
+      // If no legal moves remain, return empty (loss state)
+      if (legalMoves.length === 0) {
+        console.warn(
+          `Leader at ${characterPos} has NO legal moves! All moves cause loss.`
+        );
+        return [];
+      }
+
+      return legalMoves;
     }
+
+    return basicMoves;
   }
 
   getTeamCharacterPositions(team) {
@@ -1725,6 +1774,87 @@ class HexagonalBoard {
     }
   }
 
+  // ========== WIN CHECK LOGIC ==========
+  // Returns: { status: 'win'|'lose'|'none', winningTeam: 'white'|'black'|null, reason: string }
+  // Rule 1: CAPTURED - Dua karakter musuh adjacent ke Leader (bukan Archer)
+  // Rule 2: SURROUNDED - Semua tile adjacent terisi (musuh atau sekutu)
+  winCek(teamToCheck) {
+    const enemyTeam = teamToCheck === "white" ? "black" : "white";
+    const leaderPos = this.getLeaderPosition(teamToCheck);
+
+    if (leaderPos === null) {
+      return {
+        status: "lose",
+        winningTeam: enemyTeam,
+        reason: "Leader not found",
+      };
+    }
+
+    const adjacent = this.adjacencyMap[leaderPos];
+
+    // ===== CHECK 1: ASSASSIN KILL (instant loss) =====
+    for (const pos of adjacent) {
+      const node = this.tree[pos];
+      if (node && node.pasukanID === 12) {
+        const assassinTeam = node.isConqueredByWhite === 1 ? "white" : "black";
+        if (assassinTeam === enemyTeam) {
+          return {
+            status: "lose",
+            winningTeam: enemyTeam,
+            reason: "ASSASSIN adjacent to leader",
+          };
+        }
+      }
+    }
+
+    // ===== CHECK 2: CAPTURED (2 non-archer enemies adjacent) =====
+    let adjacentNonArcherEnemies = 0;
+    for (const pos of adjacent) {
+      const node = this.tree[pos];
+      if (node && node.pasukanID !== null) {
+        const nodeTeam = node.isConqueredByWhite === 1 ? "white" : "black";
+        if (nodeTeam === enemyTeam && node.pasukanID !== 11) {
+          // 11 = Archer, excluded from capture count
+          adjacentNonArcherEnemies++;
+        }
+      }
+    }
+
+    if (adjacentNonArcherEnemies >= 2) {
+      return {
+        status: "lose",
+        winningTeam: enemyTeam,
+        reason: "CAPTURED by 2 enemies",
+      };
+    }
+
+    // ===== CHECK 3: ARCHER SUPPORT (1 enemy + archer 2 tiles away) =====
+    if (
+      adjacentNonArcherEnemies >= 1 &&
+      this.checkArcherSupport(leaderPos, enemyTeam)
+    ) {
+      return {
+        status: "lose",
+        winningTeam: enemyTeam,
+        reason: "CAPTURED with archer support",
+      };
+    }
+
+    // ===== CHECK 4: SURROUNDED (all adjacent tiles filled) =====
+    let emptySlotsRemaining = 0;
+    for (const pos of adjacent) {
+      if (this.tree[pos].pasukanID === null) {
+        emptySlotsRemaining++;
+      }
+    }
+
+    if (emptySlotsRemaining === 0) {
+      return { status: "lose", winningTeam: enemyTeam, reason: "SURROUNDED" };
+    }
+
+    return { status: "none", winningTeam: null, reason: "" };
+  }
+
   // FIXED: Check win/lose conditions immediately after each character moves
   checkWinLoseConditions() {
     // Check both leaders
@@ -1736,80 +1866,23 @@ class HexagonalBoard {
     }
 
     // Check each leader
-    this.checkLeaderLoseConditions(whiteLeaderPos, "white");
-    this.checkLeaderLoseConditions(blackLeaderPos, "black");
-  }
-
-  checkLeaderLoseConditions(leaderPos, team) {
-    const enemyTeam = team === "white" ? "black" : "white";
-
-    // a. Check if adjacent to ASSASSIN (id: 12)
-    const adjacent = this.adjacencyMap[leaderPos];
-    for (const pos of adjacent) {
-      const node = this.tree[pos];
-      if (node.pasukanID === 12) {
-        const assassinTeam = node.isConqueredByWhite === 1 ? "white" : "black";
-        if (assassinTeam === enemyTeam) {
-          alert(
-            `${enemyTeam.toUpperCase()} WINS!\n${team.toUpperCase()} Leader is adjacent to enemy ASSASSIN!`
-          );
-          location.reload();
-          return;
-        }
-      }
-    }
-
-    // b. Check if 2 opponent characters adjacent (FIXED: Archer cannot capture if adjacent)
-    let adjacentEnemies = 0;
-    let adjacentNonArcherEnemies = 0;
-
-    for (const pos of adjacent) {
-      const node = this.tree[pos];
-      if (node.pasukanID !== null) {
-        const nodeTeam = node.isConqueredByWhite === 1 ? "white" : "black";
-        if (nodeTeam === enemyTeam) {
-          adjacentEnemies++;
-          // Only count if it's NOT an archer
-          if (node.pasukanID !== 11) {
-            adjacentNonArcherEnemies++;
-          }
-        }
-      }
-    }
-
-    // If 2 non-archer enemies are adjacent, it's a capture
-    if (adjacentNonArcherEnemies >= 2) {
+    const whiteCheck = this.winCek("white");
+    if (whiteCheck.status === "lose") {
       alert(
-        `${enemyTeam.toUpperCase()} WINS!\n${team.toUpperCase()} Leader is captured by 2 adjacent enemies!`
+        `${whiteCheck.winningTeam.toUpperCase()} WINS!\nWhite Leader: ${
+          whiteCheck.reason
+        }`
       );
       location.reload();
       return;
     }
 
-    // c. Check for ARCHER support (only with 1+ non-archer enemy adjacent AND archer 2 tiles away)
-    if (
-      adjacentNonArcherEnemies >= 1 &&
-      this.checkArcherSupport(leaderPos, enemyTeam)
-    ) {
+    const blackCheck = this.winCek("black");
+    if (blackCheck.status === "lose") {
       alert(
-        `${enemyTeam.toUpperCase()} WINS!\n${team.toUpperCase()} Leader is captured with ARCHER support!`
-      );
-      location.reload();
-      return;
-    }
-
-    // d. Check if leader can't move (all adjacent filled)
-    let canMove = false;
-    for (const pos of adjacent) {
-      if (this.tree[pos].pasukanID === null) {
-        canMove = true;
-        break;
-      }
-    }
-
-    if (!canMove) {
-      alert(
-        `${enemyTeam.toUpperCase()} WINS!\n${team.toUpperCase()} Leader cannot move!`
+        `${blackCheck.winningTeam.toUpperCase()} WINS!\nBlack Leader: ${
+          blackCheck.reason
+        }`
       );
       location.reload();
       return;
@@ -2377,46 +2450,8 @@ class HexagonalBoard {
       this.moveCharacter(charPos, move);
 
       // Check if white leader is defeated
-      const whiteLeaderPos = this.getLeaderPosition("white");
-      let isWin = false;
-
-      if (whiteLeaderPos !== null) {
-        // Check if leader is captured or can't move
-        const adjacent = this.adjacencyMap[whiteLeaderPos];
-        let nonArcherCount = 0;
-
-        for (const pos of adjacent) {
-          const n = this.tree[pos];
-          if (
-            n.pasukanID !== null &&
-            n.isConqueredByBlack === 1 &&
-            n.pasukanID !== 11
-          ) {
-            nonArcherCount++;
-          }
-        }
-
-        if (nonArcherCount >= 2) {
-          isWin = true;
-        } else if (
-          nonArcherCount >= 1 &&
-          this.checkArcherSupport(whiteLeaderPos, "black")
-        ) {
-          isWin = true;
-        }
-
-        // Check if leader can't move
-        let canMove = false;
-        for (const pos of adjacent) {
-          if (this.tree[pos].pasukanID === null) {
-            canMove = true;
-            break;
-          }
-        }
-        if (!canMove) {
-          isWin = true;
-        }
-      }
+      const whiteCheck = this.winCek("white");
+      const isWin = whiteCheck.status === "lose";
 
       this.restoreBoard(snap);
 
@@ -2767,61 +2802,124 @@ class HexagonalBoard {
     const blackLeaderPos = this.getLeaderPosition("black");
     const whiteLeaderPos = this.getLeaderPosition("white");
 
+    // Terminal states: instant win/loss for maximum confidence
     if (whiteLeaderPos === null) return 100000; // Black wins
     if (blackLeaderPos === null) return -100000; // White wins
 
+    // Check if either leader is in losing condition
+    const whiteCheck = this.winCek("white");
+    const blackCheck = this.winCek("black");
+
+    // If white leader loses (black wins)
+    if (whiteCheck.status === "lose") {
+      return 50000; // Very high score, black winning soon
+    }
+
+    // If black leader loses (white wins)
+    if (blackCheck.status === "lose") {
+      return -50000; // Very low score, black losing soon
+    }
+
     let score = 0;
 
-    // ===== OFFENSIVE SCORING =====
-    // Pressure white leader with non-archer units
+    // ===== OFFENSIVE SCORING (Black attacking White) =====
     const whiteAdj = this.adjacencyMap[whiteLeaderPos];
     let blackNonArcherAdj = 0;
+    let blackArcherAdj = 0;
 
     for (const pos of whiteAdj) {
       const n = this.tree[pos];
-      if (n && n.isConqueredByBlack === 1 && n.pasukanID !== 11) {
-        blackNonArcherAdj++;
+      if (n && n.isConqueredByBlack === 1 && n.pasukanID !== null) {
+        if (n.pasukanID === 11) {
+          blackArcherAdj++;
+        } else {
+          blackNonArcherAdj++;
+        }
       }
     }
 
-    if (blackNonArcherAdj >= 2) score += 5000; // Capture threat
-    if (
+    // CAPTURED threat: 2 non-archer enemies = major threat
+    if (blackNonArcherAdj >= 2) score += 8000;
+    // ARCHER support: 1 enemy + archer = significant threat
+    else if (
       blackNonArcherAdj >= 1 &&
       this.checkArcherSupport(whiteLeaderPos, "black")
     ) {
-      score += 3000; // Archer support
+      score += 5000;
+    }
+    // Close to capture (1 non-archer adjacent)
+    else if (blackNonArcherAdj >= 1) {
+      score += 2000;
     }
 
-    // Distance to white leader (prefer closer)
+    // SURROUNDED threat: count empty slots
+    let whiteEmptySlots = 0;
+    for (const pos of whiteAdj) {
+      if (this.tree[pos].pasukanID === null) {
+        whiteEmptySlots++;
+      }
+    }
+    if (whiteEmptySlots === 0) {
+      score += 4000; // Leader is surrounded
+    } else if (whiteEmptySlots === 1) {
+      score += 1500; // Almost surrounded
+    }
+
+    // Distance to white leader (prefer closer for all black units)
     const blackPositions = this.getTeamCharacterPositions("black");
     let totalDistance = 0;
     for (const pos of blackPositions) {
       totalDistance += this.hexDistance(pos, whiteLeaderPos);
     }
-    score -= Math.ceil(totalDistance / Math.max(1, blackPositions.length)) * 2;
+    const avgDistance = Math.ceil(
+      totalDistance / Math.max(1, blackPositions.length)
+    );
+    score -= avgDistance * 3; // Penalty for distance
 
-    // ===== DEFENSIVE SCORING =====
-    // Keep black leader safe
+    // ===== DEFENSIVE SCORING (Black protecting its leader) =====
     const blackAdj = this.adjacencyMap[blackLeaderPos];
-    let whiteEnemyAdj = 0;
+    let whiteNonArcherAdj = 0;
+    let whiteArcherAdj = 0;
 
     for (const pos of blackAdj) {
       const n = this.tree[pos];
-      if (n && n.isConqueredByWhite === 1) {
-        whiteEnemyAdj++;
+      if (n && n.isConqueredByWhite === 1 && n.pasukanID !== null) {
+        if (n.pasukanID === 11) {
+          whiteArcherAdj++;
+        } else {
+          whiteNonArcherAdj++;
+        }
       }
     }
 
-    // Penalize if leader is threatened
-    if (whiteEnemyAdj >= 2) score -= 5000;
-    if (
-      whiteEnemyAdj >= 1 &&
+    // DANGER: 2 non-archer enemies adjacent = losing
+    if (whiteNonArcherAdj >= 2) score -= 8000;
+    // DANGER: archer support
+    else if (
+      whiteNonArcherAdj >= 1 &&
       this.checkArcherSupport(blackLeaderPos, "white")
     ) {
-      score -= 3000;
+      score -= 5000;
+    }
+    // DANGER: 1 non-archer adjacent
+    else if (whiteNonArcherAdj >= 1) {
+      score -= 2000;
     }
 
-    // Ensure leader can move
+    // SURROUNDED threat: count black leader empty slots
+    let blackEmptySlots = 0;
+    for (const pos of blackAdj) {
+      if (this.tree[pos].pasukanID === null) {
+        blackEmptySlots++;
+      }
+    }
+    if (blackEmptySlots === 0) {
+      score -= 4000; // Black leader is surrounded
+    } else if (blackEmptySlots === 1) {
+      score -= 1500; // Almost surrounded
+    }
+
+    // Ensure black leader can move (critical penalty if can't)
     let blackLeaderCanMove = false;
     for (const pos of blackAdj) {
       if (this.tree[pos].pasukanID === null) {
@@ -2829,7 +2927,12 @@ class HexagonalBoard {
         break;
       }
     }
-    if (!blackLeaderCanMove) score -= 10000; // Losing condition
+    if (!blackLeaderCanMove) score -= 10000; // Losing condition imminent
+
+    // ===== PIECE ADVANTAGE =====
+    const whitePositions = this.getTeamCharacterPositions("white");
+    const pieceDiff = blackPositions.length - whitePositions.length;
+    score += pieceDiff * 100; // Small bonus for piece advantage
 
     return score;
   }
