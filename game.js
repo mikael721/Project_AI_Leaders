@@ -688,7 +688,8 @@ class HexagonalBoard {
     } else {
       // Next nemesis move
       this.currentCharacterIndex = 1;
-      this.teamCharactersToMove[1] = this.getNemesisPosition("black");
+      this.teamCharactersToMove[1] =
+        this.getNemesisPosition("black");
 
       setTimeout(() => this.runNemesisAI(), 300);
     }
@@ -2097,6 +2098,7 @@ class HexagonalBoard {
           return; // ⛔ stop flow normal
         }
 
+
         // ===== VIZIER CHECK (AFTER LEADER MOVE) =====
         const isLeader = movingCharId === 19 || movingCharId === 1;
 
@@ -2153,6 +2155,7 @@ class HexagonalBoard {
                 this.runAI();
               }, 300);
             }
+
           } else {
             this.currentCharacterIndex++;
             // GET UPDATED NEMESIS POSITION FOR NEXT MOVE
@@ -2163,9 +2166,12 @@ class HexagonalBoard {
             this.highlightCurrentCharacter();
             this.updatePhaseDisplay();
           }
+
         } else {
           this.moveToNextCharacter();
         }
+
+
       } else {
         this.selectedCharacterPosition = null;
         this.clearHighlights();
@@ -2678,15 +2684,6 @@ class HexagonalBoard {
       this.checkArcherSupport(whiteLeaderPos, "black")
     ) {
       score += 3000; // Archer support
-    }
-
-    // Penalize if archer is adjacent to white leader (wasted position)
-    for (const pos of whiteAdj) {
-      const n = this.tree[pos];
-      if (n && n.isConqueredByBlack === 1 && n.pasukanID === 11) {
-        // Archer is adjacent to white leader - this is bad positioning
-        score -= 800; // Negative points for poor archer placement
-      }
     }
 
     // Distance to white leader (prefer closer)

@@ -42,7 +42,7 @@ export const characters = [
     fullart: "/Full Art/LEADERS-Acrobate.PNG",
     white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Acrobate.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Acrobate.png",
-    poin: 1,
+    poin: 3,
     isKing: false,
 
     tim: "white",
@@ -55,7 +55,7 @@ export const characters = [
     fullart: "Full Art/LEADERS-Cavalier.PNG",
     white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Cavalier.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Cavalier.png",
-    poin: 8,
+    poin: 3,
     isKing: false,
 
     tim: "white",
@@ -74,7 +74,7 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: 2,
+    id: 4,
   },
   {
     nama: "ROYAL GUARD",
@@ -89,7 +89,7 @@ export const characters = [
 
     tim: "white",
     possition: null,
-    id: 4,
+    id: 5,
   },
   {
     nama: "ILLUSIONIST",
@@ -130,7 +130,7 @@ export const characters = [
       "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Manipulatrice.png",
     black:
       "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Manipulatrice.png",
-    poin: 5,
+    poin: 3,
     isKing: false,
 
     tim: "white",
@@ -143,7 +143,7 @@ export const characters = [
     fullart: "Full Art/LEADERS-Furie.PNG",
     white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Rodeuse.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Rodeuse.png",
-    poin: 9,
+    poin: 3,
     isKing: false,
 
     tim: "white",
@@ -157,7 +157,7 @@ export const characters = [
     white:
       "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Tavernier.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Tavernier.png",
-    poin: 1,
+    poin: 3,
     isKing: false,
 
     tim: "white",
@@ -174,7 +174,7 @@ export const characters = [
     fullart: "Full Art/LEADERS-Archere-LQ.PNG",
     white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Archere.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Archere.png",
-    poin: 7,
+    poin: 4,
     isKing: false,
 
     tim: "white",
@@ -200,7 +200,7 @@ export const characters = [
     fullart: "Full Art/LEADERS-Disrupteur.PNG",
     white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Geolier.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Geolier.png",
-    poin: 8,
+    poin: 4,
     isKing: false,
 
     tim: "white",
@@ -215,7 +215,7 @@ export const characters = [
       "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Protecteur.png",
     black:
       "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Protecteur.png",
-    poin: 9,
+    poin: 4,
     isKing: false,
 
     tim: "white",
@@ -228,7 +228,7 @@ export const characters = [
     fullart: "Full Art/LEADERS-Oracle.PNG",
     white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Vizir.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Vizir.png",
-    poin: 10,
+    poin: 4,
     isKing: false,
 
     tim: "white",
@@ -246,7 +246,7 @@ export const characters = [
     white:
       "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_VieilOurs.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_VieilOurs.png",
-    poin: 15,
+    poin: 6,
     isKing: false,
 
     tim: "white",
