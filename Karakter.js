@@ -228,7 +228,7 @@ export const characters = [
     fullart: "Full Art/LEADERS-Oracle.PNG",
     white: "/Assets BGA/Pions personnages/Blanc/Leaders_BGA_white_Vizir.png",
     black: "/Assets BGA/Pions personnages/Noir/Leaders_BGA_black_Vizir.png",
-    poin: 4,
+    poin: 0,
     isKing: false,
 
     tim: "white",

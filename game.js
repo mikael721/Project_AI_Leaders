@@ -2525,7 +2525,7 @@ class HexagonalBoard {
       for (const move of moves) {
         const snap = this.snapshotBoard();
         this.moveCharacter(charPos, move);
-        const score = this.minimaxAI(depth - 1, false, -Infinity, Infinity);
+        const score = this.minimaxAI(depth - 1, 0,true, -Infinity, Infinity);
         this.restoreBoard(snap);
 
         if (score > bestScore) {
@@ -2598,7 +2598,7 @@ class HexagonalBoard {
     for (const move of moves) {
       const snap = this.snapshotBoard();
       this.moveCharacter(charPos, move);
-      const score = this.minimaxAI(depth - 1, false, -Infinity, Infinity);
+      const score = this.minimaxAI(depth - 1, 0,true, -Infinity, Infinity);
       this.restoreBoard(snap);
 
       if (score > bestScore) {
@@ -2611,7 +2611,7 @@ class HexagonalBoard {
   }
 
   // ========== MINIMAX WITH ALPHA-BETA PRUNING ==========
-  minimaxAI(depth, isMaximizing, alpha, beta) {
+  minimaxAI(depth, unitIndex, isMaximizing, alpha, beta) {
     if (depth === 0) {
       return this.evaluateAI();
     }
@@ -2621,37 +2621,91 @@ class HexagonalBoard {
       (pos) => this.tree[pos].pasukanID !== 18 // Exclude NEMESIS
     );
 
+    if (positions.length === 0) { // jika tak ada unit
+      return this.minimaxAI(
+        depth - 1,
+        0,
+        !isMaximizing,
+        alpha,
+        beta
+      );
+    }
+
+    if (unitIndex >= positions.length) { // ini klo semua pasukan di suatu tim udah di proses
+      return this.minimaxAI(
+        depth - 1, // depthnya dikurangi 1
+        0,
+        !isMaximizing, // ganti max ke min atau sebaliknya
+        alpha,
+        beta
+      );
+    }
+
+    const from = positions[unitIndex];
+    const moves = this.getMovePositions(from);
+
+    // === JIKA UNIT TIDAK PUNYA MOVE → LEWATI KE UNIT BERIKUT ===
+    if (moves.length === 0) {
+      return this.minimaxAI(
+        depth,
+        unitIndex + 1,
+        isMaximizing,
+        alpha,
+        beta
+      );
+    }
+
+    // ================= MAX (BLACK) =================
     if (isMaximizing) {
       let maxEval = -Infinity;
-      for (const pos of positions) {
-        const moves = this.getMovePositions(pos);
-        for (const to of moves) {
-          const snap = this.snapshotBoard();
-          this.moveCharacter(pos, to);
-          const evalScore = this.minimaxAI(depth - 1, false, alpha, beta);
-          this.restoreBoard(snap);
 
-          maxEval = Math.max(maxEval, evalScore);
-          alpha = Math.max(alpha, evalScore);
-          if (beta <= alpha) return maxEval; // Beta cutoff
-        }
+      for (const to of moves) {
+        const snap = this.snapshotBoard();
+        this.moveCharacter(from, to);
+
+        const evalScore = this.minimaxAI(
+          depth,
+          unitIndex + 1,
+          isMaximizing,
+          alpha,
+          beta
+        );
+
+        this.restoreBoard(snap);
+
+        maxEval = Math.max(maxEval, evalScore);
+        alpha = Math.max(alpha, evalScore);
+
+        if (beta <= alpha) break; // beta cutoff
       }
+
       return maxEval === -Infinity ? 0 : maxEval;
-    } else {
-      let minEval = Infinity;
-      for (const pos of positions) {
-        const moves = this.getMovePositions(pos);
-        for (const to of moves) {
-          const snap = this.snapshotBoard();
-          this.moveCharacter(pos, to);
-          const evalScore = this.minimaxAI(depth - 1, true, alpha, beta);
-          this.restoreBoard(snap);
+    }
 
-          minEval = Math.min(minEval, evalScore);
-          beta = Math.min(beta, evalScore);
-          if (beta <= alpha) return minEval; // Alpha cutoff
-        }
+    // ================= MIN (WHITE) =================
+    else {
+      let minEval = Infinity;
+
+      for (const to of moves) {
+        const snap = this.snapshotBoard();
+        this.moveCharacter(from, to);
+
+        const evalScore = this.minimaxAI(
+          depth,
+          unitIndex + 1,
+          isMaximizing,
+          alpha,
+          beta
+        );
+
+        this.restoreBoard(snap);
+
+        minEval = Math.min(minEval, evalScore);
+        beta = Math.min(beta, evalScore);
+
+        if (beta <= alpha) break; // alpha cutoff
       }
+
       return minEval === Infinity ? 0 : minEval;
     }
   }
