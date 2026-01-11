@@ -688,8 +688,7 @@ class HexagonalBoard {
     } else {
       // Next nemesis move
       this.currentCharacterIndex = 1;
-      this.teamCharactersToMove[1] =
-        this.getNemesisPosition("black");
+      this.teamCharactersToMove[1] = this.getNemesisPosition("black");
 
       setTimeout(() => this.runNemesisAI(), 300);
     }
@@ -2098,7 +2097,6 @@ class HexagonalBoard {
           return; // ⛔ stop flow normal
         }
 
-
         // ===== VIZIER CHECK (AFTER LEADER MOVE) =====
         const isLeader = movingCharId === 19 || movingCharId === 1;
 
@@ -2155,7 +2153,6 @@ class HexagonalBoard {
                 this.runAI();
               }, 300);
             }
-
           } else {
             this.currentCharacterIndex++;
             // GET UPDATED NEMESIS POSITION FOR NEXT MOVE
@@ -2166,12 +2163,9 @@ class HexagonalBoard {
             this.highlightCurrentCharacter();
             this.updatePhaseDisplay();
           }
-
         } else {
           this.moveToNextCharacter();
         }
-
-
       } else {
         this.selectedCharacterPosition = null;
         this.clearHighlights();
@@ -2525,7 +2519,15 @@ class HexagonalBoard {
       for (const move of moves) {
         const snap = this.snapshotBoard();
         this.moveCharacter(charPos, move);
-        const score = this.minimaxAI(depth - 1, false, -Infinity, Infinity);
+        // Call minimax with Black turn (isBlackTurn = true, maximizing player perspective)
+        const score = this.minimaxAI(
+          depth - 1,
+          true,
+          -1,
+          -1,
+          -Infinity,
+          Infinity
+        );
         this.restoreBoard(snap);
 
         if (score > bestScore) {
@@ -2598,7 +2600,15 @@ class HexagonalBoard {
     for (const move of moves) {
       const snap = this.snapshotBoard();
       this.moveCharacter(charPos, move);
-      const score = this.minimaxAI(depth - 1, false, -Infinity, Infinity);
+      // Call minimax with Black turn (isBlackTurn = true, maximizing player perspective)
+      const score = this.minimaxAI(
+        depth - 1,
+        true,
+        -1,
+        -1,
+        -Infinity,
+        Infinity
+      );
       this.restoreBoard(snap);
 
       if (score > bestScore) {
@@ -2611,24 +2621,81 @@ class HexagonalBoard {
   }
 
   // ========== MINIMAX WITH ALPHA-BETA PRUNING ==========
-  minimaxAI(depth, isMaximizing, alpha, beta) {
+  // Structure: LEADERS Game - White moves ALL units, THEN Black moves ALL units
+  // Pattern: max-max-max-max (for Black/AI) or min-min-min-min (for White/Human)
+  // Parameters:
+  // - depth: search depth
+  // - isBlackTurn: true = Black team's movement phase, false = White team's movement phase
+  // - blackUnitsRemaining: number of Black units still needing to move
+  // - whiteUnitsRemaining: number of White units still needing to move
+  // - alpha, beta: pruning bounds
+  //
+  // GAME RULES (LEADERS):
+  // ✅ Turn Structure: White moves ALL pieces → Black moves ALL pieces → Recruitment Phase → Next Round
+  // ✅ Minimax Pattern: max-max-max (for Black/AI) or min-min-min (for White/Human)
+  // ✅ Unit Tracking: Each recursive call decrements units remaining (-1) when a unit finishes moving
+  // ✅ Phase Switch: When one team's units <= 0, automatically switch to next team's turn
+  // ✅ Ignoring Recruitment: This minimax only handles movement phase, recruitment is ignored
+  minimaxAI(
+    depth,
+    isBlackTurn,
+    blackUnitsRemaining = -1,
+    whiteUnitsRemaining = -1,
+    alpha = -Infinity,
+    beta = Infinity
+  ) {
+    // Initialize units remaining on first call
+    if (blackUnitsRemaining === -1) {
+      blackUnitsRemaining = this.getTeamCharacterPositions("black").filter(
+        (pos) => this.tree[pos].pasukanID !== 18 // Exclude NEMESIS
+      ).length;
+    }
+    if (whiteUnitsRemaining === -1) {
+      whiteUnitsRemaining = this.getTeamCharacterPositions("white").filter(
+        (pos) => this.tree[pos].pasukanID !== 18 // Exclude NEMESIS
+      ).length;
+    }
+
+    // Terminal condition: depth reached or no units to move
     if (depth === 0) {
       return this.evaluateAI();
     }
 
-    const team = isMaximizing ? "black" : "white";
-    const positions = this.getTeamCharacterPositions(team).filter(
-      (pos) => this.tree[pos].pasukanID !== 18 // Exclude NEMESIS
-    );
+    // BLACK TEAM TURN (Maximizing - AI perspective)
+    if (isBlackTurn) {
+      if (blackUnitsRemaining <= 0) {
+        // ✅ Black has finished moving all units, switch to White (min-min-min pattern continues)
+        return this.minimaxAI(
+          depth,
+          false,
+          blackUnitsRemaining,
+          whiteUnitsRemaining,
+          alpha,
+          beta
+        );
+      }
 
-    if (isMaximizing) {
       let maxEval = -Infinity;
-      for (const pos of positions) {
+      const blackPositions = this.getTeamCharacterPositions("black").filter(
+        (pos) => this.tree[pos].pasukanID !== 18 // Exclude NEMESIS
+      );
+
+      for (const pos of blackPositions) {
         const moves = this.getMovePositions(pos);
         for (const to of moves) {
           const snap = this.snapshotBoard();
           this.moveCharacter(pos, to);
-          const evalScore = this.minimaxAI(depth - 1, false, alpha, beta);
+
+          // Decrement Black units remaining (one unit finished its move)
+          const newBlackUnits = blackUnitsRemaining - 1;
+          const evalScore = this.minimaxAI(
+            depth - 1,
+            true, // Stay in Black turn (max-max-max)
+            newBlackUnits,
+            whiteUnitsRemaining,
+            alpha,
+            beta
+          );
           this.restoreBoard(snap);
 
           maxEval = Math.max(maxEval, evalScore);
@@ -2636,15 +2703,51 @@ class HexagonalBoard {
           if (beta <= alpha) return maxEval; // Beta cutoff
         }
       }
+
       return maxEval === -Infinity ? 0 : maxEval;
-    } else {
+    }
+
+    // WHITE TEAM TURN (Minimizing - opponent perspective)
+    // ✅ Pattern: min-min-min (opponent's moves are minimizing the score)
+    else {
+      if (whiteUnitsRemaining <= 0) {
+        // ✅ White has finished moving all units, evaluate or restart cycle
+        // Decrement depth to progress towards terminal state
+        if (depth > 1) {
+          return this.minimaxAI(
+            depth - 1,
+            true,
+            blackUnitsRemaining,
+            whiteUnitsRemaining,
+            alpha,
+            beta
+          );
+        } else {
+          return this.evaluateAI();
+        }
+      }
+
       let minEval = Infinity;
-      for (const pos of positions) {
+      const whitePositions = this.getTeamCharacterPositions("white").filter(
+        (pos) => this.tree[pos].pasukanID !== 18 // Exclude NEMESIS
+      );
+
+      for (const pos of whitePositions) {
         const moves = this.getMovePositions(pos);
         for (const to of moves) {
           const snap = this.snapshotBoard();
           this.moveCharacter(pos, to);
-          const evalScore = this.minimaxAI(depth - 1, true, alpha, beta);
+
+          // Decrement White units remaining (one unit finished its move)
+          const newWhiteUnits = whiteUnitsRemaining - 1;
+          const evalScore = this.minimaxAI(
+            depth,
+            false, // Stay in White turn (min-min-min)
+            blackUnitsRemaining,
+            newWhiteUnits,
+            alpha,
+            beta
+          );
           this.restoreBoard(snap);
 
           minEval = Math.min(minEval, evalScore);
@@ -2652,11 +2755,14 @@ class HexagonalBoard {
           if (beta <= alpha) return minEval; // Alpha cutoff
         }
       }
+
       return minEval === Infinity ? 0 : minEval;
     }
   }
 
   // ========== EVALUATION FUNCTION ==========
+  // Scoring perspective: POSITIVE = Black (AI) is winning, NEGATIVE = White is winning
+  // This score is used in minimax: higher score favors Black moves (maximizing), lower score favors White moves (minimizing)
   evaluateAI() {
     const blackLeaderPos = this.getLeaderPosition("black");
     const whiteLeaderPos = this.getLeaderPosition("white");
